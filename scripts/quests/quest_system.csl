@@ -1,0 +1,248 @@
+Quest_Type :: enum {
+    KILL_ENEMIES;
+    GATHER_RESOURCES;
+    CRAFT_ITEM;
+    CRAFT_GEAR;
+    BUILD_STRUCTURE;
+    EQUIP_GEAR;
+    REACH_ZONE;
+    UPGRADE_STRUCTURE;
+}
+
+Quest_Def :: class {
+    id: string;
+    name: string;
+    description: string;
+    quest_type: Quest_Type;
+    target_count: int;
+    reward_resource: Resource_Type;
+    reward_amount: int;
+    zone_requirement: int;
+}
+
+all_quest_defs: [..]Quest_Def;
+
+TOTAL_QUESTS :: 15;
+
+register_quests :: proc() {
+    // Chapter 1: Getting Started
+    add_quest("q01", "First Blood", "Defeat 2 enemies.",
+        .KILL_ENEMIES, 2, .SALVAGE, 5, 0);
+
+    add_quest("q02", "Scavenger", "Gather 5 resources.",
+        .GATHER_RESOURCES, 5, .SCRAP_METAL, 5, 0);
+
+    add_quest("q03", "Field Medic", "Craft any consumable.",
+        .CRAFT_ITEM, 1, .FOOD, 5, 0);
+
+    add_quest("q04", "Armed Up", "Craft a piece of gear.",
+        .CRAFT_GEAR, 1, .SALVAGE, 8, 0);
+
+    add_quest("q05", "Suit Up", "Equip any gear item.",
+        .EQUIP_GEAR, 1, .SCRAP_METAL, 8, 0);
+
+    // Chapter 2: Settling In
+    add_quest("q06", "Homestead", "Build your first structure.",
+        .BUILD_STRUCTURE, 1, .FUEL_CELL, 3, 0);
+
+    add_quest("q07", "Zone Runner", "Reach Zone 2.",
+        .REACH_ZONE, 2, .NEXUS_CRYSTAL, 3, 0);
+
+    add_quest("q08", "Hunter", "Defeat 10 enemies.",
+        .KILL_ENEMIES, 10, .ALLOY_COMPONENT, 3, 0);
+
+    add_quest("q09", "Stockpile", "Gather 25 resources.",
+        .GATHER_RESOURCES, 25, .FUEL_CELL, 5, 0);
+
+    add_quest("q10", "Fortify", "Upgrade a structure.",
+        .UPGRADE_STRUCTURE, 1, .NEXUS_CRYSTAL, 5, 0);
+
+    // Chapter 3: Into the Wilds
+    add_quest("q11", "Frontier", "Reach Zone 3.",
+        .REACH_ZONE, 3, .VOLATILE_SHARD, 3, 0);
+
+    add_quest("q12", "Veteran", "Defeat 25 enemies.",
+        .KILL_ENEMIES, 25, .FACTION_TECH, 3, 0);
+
+    add_quest("q13", "Master Crafter", "Craft 5 gear items.",
+        .CRAFT_GEAR, 5, .RARE_BIOLOGIC, 3, 0);
+
+    // Chapter 4: The Deep
+    add_quest("q14", "The Edge", "Reach Zone 4.",
+        .REACH_ZONE, 4, .UMBRALARI_FRAGMENT, 2, 0);
+
+    add_quest("q15", "Awakened", "Defeat 50 enemies.",
+        .KILL_ENEMIES, 50, .PURE_NEXUS_ESSENCE, 2, 0);
+}
+
+add_quest :: proc(id: string, name: string, description: string,
+                  quest_type: Quest_Type, target_count: int,
+                  reward_resource: Resource_Type, reward_amount: int,
+                  zone_requirement: int) {
+    q := new(Quest_Def);
+    q.id = id;
+    q.name = name;
+    q.description = description;
+    q.quest_type = quest_type;
+    q.target_count = target_count;
+    q.reward_resource = reward_resource;
+    q.reward_amount = reward_amount;
+    q.zone_requirement = zone_requirement;
+    all_quest_defs->append(q);
+}
+
+get_quest_def :: proc(index: int) -> Quest_Def {
+    if index < 0 return null;
+    if index >= all_quest_defs.count return null;
+    return all_quest_defs[index];
+}
+
+// ---------------------------------------------------------------------------
+// Per-player quest state
+// ---------------------------------------------------------------------------
+
+Quest_Progress :: class {
+    version: int @ao_serialize;
+    current_quest: int @ao_serialize;
+    progress: int @ao_serialize;
+    total_kills: int @ao_serialize;
+    total_gathered: int @ao_serialize;
+    total_crafted: int @ao_serialize;
+    total_gear_crafted: int @ao_serialize;
+    total_built: int @ao_serialize;
+    total_upgraded: int @ao_serialize;
+    total_equipped: int @ao_serialize;
+    highest_zone: int @ao_serialize;
+    completed_all: bool @ao_serialize;
+}
+
+QUEST_SAVE_VERSION :: 1;
+
+init_player_quests :: proc(player: Player) {
+    player.quest_progress = new(Quest_Progress);
+    if !Save.try_get_json(player, "quest_progress", ref player.quest_progress) {
+        player.quest_progress = new(Quest_Progress);
+        player.quest_progress.version = QUEST_SAVE_VERSION;
+        player.quest_progress.current_quest = 0;
+        player.quest_progress.highest_zone = 1;
+    }
+}
+
+save_quests :: proc(player: Player) {
+    if player.quest_progress == null return;
+    Save.set_json(player, "quest_progress", ref player.quest_progress);
+}
+
+// ---------------------------------------------------------------------------
+// Progress tracking hooks (called from gameplay systems)
+// ---------------------------------------------------------------------------
+
+on_quest_enemy_killed :: proc(player: Player) {
+    if player.quest_progress == null return;
+    player.quest_progress.total_kills += 1;
+    check_quest_completion(player);
+}
+
+on_quest_resource_gathered :: proc(player: Player, amount: int) {
+    if player.quest_progress == null return;
+    player.quest_progress.total_gathered += amount;
+    check_quest_completion(player);
+}
+
+on_quest_item_crafted :: proc(player: Player) {
+    if player.quest_progress == null return;
+    player.quest_progress.total_crafted += 1;
+    check_quest_completion(player);
+}
+
+on_quest_gear_crafted :: proc(player: Player) {
+    if player.quest_progress == null return;
+    player.quest_progress.total_gear_crafted += 1;
+    check_quest_completion(player);
+}
+
+on_quest_structure_built :: proc(player: Player) {
+    if player.quest_progress == null return;
+    player.quest_progress.total_built += 1;
+    check_quest_completion(player);
+}
+
+on_quest_structure_upgraded :: proc(player: Player) {
+    if player.quest_progress == null return;
+    player.quest_progress.total_upgraded += 1;
+    check_quest_completion(player);
+}
+
+on_quest_gear_equipped :: proc(player: Player) {
+    if player.quest_progress == null return;
+    player.quest_progress.total_equipped += 1;
+    check_quest_completion(player);
+}
+
+update_quest_zone :: proc(player: Player) {
+    if player.quest_progress == null return;
+    zone := get_zone(player.entity.world_position);
+    if zone > player.quest_progress.highest_zone {
+        player.quest_progress.highest_zone = zone;
+        check_quest_completion(player);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Completion check
+// ---------------------------------------------------------------------------
+
+get_current_progress :: proc(player: Player) -> int {
+    if player.quest_progress == null return 0;
+    qp := player.quest_progress;
+    qi := qp.current_quest;
+    def := get_quest_def(qi);
+    if def == null return 0;
+
+    switch def.quest_type {
+        case .KILL_ENEMIES:      { return qp.total_kills; }
+        case .GATHER_RESOURCES:  { return qp.total_gathered; }
+        case .CRAFT_ITEM:        { return qp.total_crafted; }
+        case .CRAFT_GEAR:        { return qp.total_gear_crafted; }
+        case .BUILD_STRUCTURE:   { return qp.total_built; }
+        case .EQUIP_GEAR:        { return qp.total_equipped; }
+        case .REACH_ZONE:        { return qp.highest_zone; }
+        case .UPGRADE_STRUCTURE: { return qp.total_upgraded; }
+    }
+    return 0;
+}
+
+check_quest_completion :: proc(player: Player) {
+    if player.quest_progress == null return;
+    if player.quest_progress.completed_all return;
+
+    qi := player.quest_progress.current_quest;
+    def := get_quest_def(qi);
+    if def == null return;
+
+    progress := get_current_progress(player);
+    if progress >= def.target_count {
+        complete_quest(player, def);
+    }
+}
+
+complete_quest :: proc(player: Player, def: Quest_Def) {
+    // Grant reward
+    res_defn := get_resource_definition(def.reward_resource);
+    if res_defn != null {
+        reward_item := Items.create_item_instance(res_defn, def.reward_amount.(s64));
+        destroyed: bool;
+        Items.move_as_many_items_as_possible_to_inventory(reward_item, player.default_inventory, ref destroyed);
+    }
+
+    Notifier.notify(player, format_string("Quest Complete: %!", {def.name}));
+
+    // Advance to next quest
+    player.quest_progress.current_quest += 1;
+    if player.quest_progress.current_quest >= all_quest_defs.count {
+        player.quest_progress.completed_all = true;
+        Notifier.notify(player, "All quests completed! You have Awakened.");
+    }
+
+    save_quests(player);
+}

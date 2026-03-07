@@ -7,12 +7,14 @@ import "combat"
 import "enemies"
 import "gathering"
 import "equipment"
+import "quests"
 import "ui"
 
 ao_before_scene_load :: proc() {
     register_resources();
     register_structure_defs();
     register_gear();
+    register_quests();
 }
 
 ao_start :: proc() {

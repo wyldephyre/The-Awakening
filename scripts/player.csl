@@ -31,6 +31,10 @@ Player :: class : Player_Base {
     build_mode: bool;
     build_selected: int;
     gear_open: bool;
+    quest_log_open: bool;
+
+    // Quests
+    quest_progress: Quest_Progress;
 
     // Outpost
     outpost: Player_Outpost;
@@ -71,6 +75,7 @@ Player :: class : Player_Base {
         if character_created {
             init_player_outpost(this);
             init_player_equipment(this);
+            init_player_quests(this);
         }
     }
 
@@ -132,6 +137,13 @@ Player :: class : Player_Base {
                     draw_equipment_panel(this);
                 }
 
+                if quest_log_open {
+                    draw_quest_log(this);
+                }
+
+                draw_quest_tracker(this);
+                update_quest_zone(this);
+
                 draw_outpost_world(this);
             }
         }
@@ -142,6 +154,7 @@ Player :: class : Player_Base {
             save_player_data(this);
             save_outpost(this);
             save_equipment(this);
+            save_quests(this);
         }
     }
 

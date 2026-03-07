@@ -378,5 +378,11 @@ craft_recipe :: proc(player: Player, recipe: Recipe) -> bool {
     if !can_craft_recipe(player, recipe) return false;
     consume_ingredients(player, recipe);
     apply_recipe_result(player, recipe);
+
+    if recipe.result_type == .GEAR {
+        on_quest_gear_crafted(player);
+    } else {
+        on_quest_item_crafted(player);
+    }
     return true;
 }

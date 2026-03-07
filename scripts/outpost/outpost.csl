@@ -312,6 +312,7 @@ place_structure :: proc(player: Player, kind: Structure_Kind, gx: int, gy: int) 
     save_outpost(player);
 
     Notifier.notify(player, format_string("Built %!", {def.name}));
+    on_quest_structure_built(player);
     return true;
 }
 
@@ -337,6 +338,7 @@ upgrade_structure :: proc(player: Player, index: int) -> bool {
     save_outpost(player);
 
     Notifier.notify(player, format_string("Upgraded % to Lv%!", {def.name, placed.level}));
+    on_quest_structure_upgraded(player);
     return true;
 }
 

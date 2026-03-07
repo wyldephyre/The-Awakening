@@ -247,4 +247,5 @@ complete_character_creation :: proc(player: Player) {
     save_player_data(player);
     init_player_outpost(player);
     init_player_equipment(player);
+    init_player_quests(player);
 }

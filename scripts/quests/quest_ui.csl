@@ -1,0 +1,202 @@
+// Active quest tracker (always visible on left side of HUD)
+draw_quest_tracker :: proc(player: Player) {
+    if player.quest_progress == null return;
+    if player.quest_progress.completed_all return;
+
+    qi := player.quest_progress.current_quest;
+    def := get_quest_def(qi);
+    if def == null return;
+
+    safe := UI.get_safe_screen_rect();
+    tracker := safe->left_rect()->grow(0, 240, 0, 0)->inset(80, 0, 0, 10);
+    tracker = tracker->cut_top(80);
+
+    UI.quad(tracker, core_globals.white_sprite, {0, 0, 0, 0.4});
+
+    content := tracker->inset(6);
+
+    ts := UI.default_text_settings();
+    ts.size = 22;
+    ts.halign = .LEFT;
+    ts.valign = .TOP;
+    ts.do_outline = true;
+    ts.outline_thickness = 1;
+    ts.outline_color = {0, 0, 0, 1};
+
+    // Quest name
+    name_rect := content->cut_top(24);
+    ts.color = {1, 0.85, 0.3, 1};
+    UI.text(name_rect, ts, def.name);
+
+    // Description
+    desc_rect := content->cut_top(22);
+    ts.size = 18;
+    ts.color = {0.8, 0.8, 0.8, 1};
+    UI.text(desc_rect, ts, def.description);
+
+    // Progress bar
+    content->cut_top(4);
+    bar_rect := content->cut_top(16);
+    UI.quad(bar_rect, core_globals.white_sprite, {0.15, 0.15, 0.2, 0.8});
+
+    progress := get_current_progress(player);
+    target := def.target_count;
+    pct := 0.0;
+    if target > 0 {
+        pct = progress.(float) / target.(float);
+    }
+    if pct > 1.0 { pct = 1.0; }
+    if pct > 0 {
+        filled := bar_rect->subrect(0, 0, pct, 1);
+        UI.quad(filled, core_globals.white_sprite, {0.3, 0.8, 0.3, 0.9});
+    }
+
+    // Progress text
+    ts.size = 16;
+    ts.color = {1, 1, 1, 1};
+    ts.halign = .CENTER;
+    ts.valign = .CENTER;
+    display_progress := progress;
+    if display_progress > target {
+        display_progress = target;
+    }
+    UI.text(bar_rect, ts, "%/%", {display_progress, target});
+}
+
+// Full quest log panel
+draw_quest_log :: proc(player: Player) {
+    UI.push_layer_relative(50);
+    defer UI.pop_layer();
+
+    safe := UI.get_safe_screen_rect();
+
+    UI.quad(UI.get_screen_rect(), core_globals.white_sprite, {0, 0, 0, 0.65});
+
+    panel := safe->center_rect()->grow(300, 260, 300, 260);
+    UI.quad(panel, core_globals.white_sprite, {0.1, 0.1, 0.15, 0.95});
+
+    // Header
+    header := panel->cut_top(60);
+    UI.quad(header, core_globals.white_sprite, {0.15, 0.15, 0.2, 1});
+
+    ts := UI.default_text_settings();
+    ts.size = 42;
+    ts.color = {1, 1, 1, 1};
+    ts.halign = .CENTER;
+    ts.valign = .CENTER;
+    ts.do_outline = true;
+    ts.outline_thickness = 2;
+    ts.outline_color = {0, 0, 0, 1};
+    UI.text(header, ts, "Quest Log");
+
+    // Close button
+    bs := UI.default_button_settings();
+    bs.sprite = get_asset(Texture_Asset, "$AO/new/modal/buttons_2/button_3.png");
+    bs.press_scaling = 0.35;
+    close_ts := UI.default_text_settings();
+    close_ts.size = 36;
+    close_ts.color = {1, 1, 1, 1};
+    close_rect := header->top_right_rect()->grow(32, 0, 32, 65);
+    if UI.button(close_rect, bs, close_ts, "X").clicked {
+        player.quest_log_open = false;
+        return;
+    }
+
+    panel->cut_top(8);
+
+    // Quest list
+    for i: 0..all_quest_defs.count-1 {
+        UI.push_id("quest_%", {i});
+        defer UI.pop_id();
+
+        def := all_quest_defs[i];
+        row := panel->cut_top(65);
+        panel->cut_top(3);
+
+        draw_quest_log_row(player, row, def, i);
+    }
+}
+
+draw_quest_log_row :: proc(player: Player, row: Rect, def: Quest_Def, index: int) {
+    if player.quest_progress == null return;
+
+    current := player.quest_progress.current_quest;
+    is_complete := index < current;
+    is_active := index == current && !player.quest_progress.completed_all;
+    is_locked := index > current;
+
+    // Background
+    bg_color := v4{0.12, 0.12, 0.16, 0.6};
+    if is_active {
+        bg_color = {0.15, 0.18, 0.25, 0.9};
+    }
+    UI.quad(row, core_globals.white_sprite, bg_color);
+
+    // Status pip
+    pip := row->cut_left(8);
+    pip_color := v4{0.3, 0.3, 0.3, 1};
+    if is_complete {
+        pip_color = {0.3, 0.9, 0.3, 1};
+    } else if is_active {
+        pip_color = {1, 0.85, 0.3, 1};
+    }
+    UI.quad(pip, core_globals.white_sprite, pip_color);
+
+    content := row->inset(6);
+
+    ts := UI.default_text_settings();
+    ts.halign = .LEFT;
+    ts.valign = .TOP;
+    ts.do_outline = true;
+    ts.outline_thickness = 1;
+    ts.outline_color = {0, 0, 0, 1};
+
+    // Quest name
+    name_rect := content->cut_top(26);
+    ts.size = 24;
+    if is_complete {
+        ts.color = {0.5, 0.8, 0.5, 1};
+    } else if is_active {
+        ts.color = {1, 0.85, 0.3, 1};
+    } else {
+        ts.color = {0.4, 0.4, 0.4, 1};
+    }
+
+    status_prefix := "";
+    if is_complete {
+        status_prefix = "[DONE] ";
+    } else if is_active {
+        status_prefix = "[>>] ";
+    }
+    UI.text(name_rect, ts, "%0%", {status_prefix, def.name});
+
+    // Description + progress
+    ts.size = 20;
+    if is_locked {
+        ts.color = {0.3, 0.3, 0.3, 1};
+        UI.text(content, ts, "???");
+    } else {
+        if is_complete {
+            ts.color = {0.4, 0.6, 0.4, 1};
+        } else {
+            ts.color = {0.7, 0.7, 0.7, 1};
+        }
+        UI.text(content, ts, def.description);
+
+        if is_active {
+            progress := get_current_progress(player);
+            target := def.target_count;
+            display_progress := progress;
+            if display_progress > target {
+                display_progress = target;
+            }
+
+            prog_rect := row->cut_right(80)->inset(4);
+            ts.size = 22;
+            ts.halign = .CENTER;
+            ts.valign = .CENTER;
+            ts.color = {0.5, 1, 0.5, 1};
+            UI.text(prog_rect, ts, "%/%", {display_progress, target});
+        }
+    }
+}

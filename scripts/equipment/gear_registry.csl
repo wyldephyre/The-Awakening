@@ -150,6 +150,7 @@ equip_from_inventory :: proc(player: Player, slot_index: int) -> bool {
     recalculate_gear_bonuses(player);
     save_equipment(player);
     Notifier.notify(player, format_string("Equipped %!", {gear_defn->get_name()}));
+    on_quest_gear_equipped(player);
     return true;
 }
 

@@ -39,6 +39,7 @@ draw_hud :: proc(player: Player) {
         player.crafting_open = !player.crafting_open;
         player.build_mode = false;
         player.gear_open = false;
+        player.quest_log_open = false;
     }
 
     // Build button - right side under craft
@@ -59,6 +60,7 @@ draw_hud :: proc(player: Player) {
         player.build_selected = -1;
         player.crafting_open = false;
         player.gear_open = false;
+        player.quest_log_open = false;
     }
 
     // Gear button - right side under build
@@ -78,6 +80,27 @@ draw_hud :: proc(player: Player) {
         player.gear_open = !player.gear_open;
         player.crafting_open = false;
         player.build_mode = false;
+        player.quest_log_open = false;
+    }
+
+    // Quest log button - right side under gear
+    quest_rect := safe->top_right_rect()->grow(0, 0, 37, 105)->offset(-20, -240);
+    quest_bs := UI.default_button_settings();
+    quest_bs.press_scaling = 0.35;
+    quest_ts := UI.default_text_settings();
+    quest_ts.size = 30;
+    quest_ts.color = {1, 1, 1, 1};
+
+    if player.quest_log_open {
+        quest_bs.sprite = get_asset(Texture_Asset, "$AO/new/modal/buttons_2/button_5.png");
+    } else {
+        quest_bs.sprite = get_asset(Texture_Asset, "$AO/new/modal/buttons_2/button_9.png");
+    }
+    if UI.button(quest_rect, quest_bs, quest_ts, "Quests").clicked {
+        player.quest_log_open = !player.quest_log_open;
+        player.crafting_open = false;
+        player.build_mode = false;
+        player.gear_open = false;
     }
 }
 

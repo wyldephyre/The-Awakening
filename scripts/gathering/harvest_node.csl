@@ -162,6 +162,8 @@ harvest_node_drop :: proc(node: Harvest_Node, player: Player) {
         dropped->set_exclusive(player);
         dropped->do_spawn_animation(ref node.rng);
     }
+
+    on_quest_resource_gathered(player, drop_count);
 }
 
 deplete_node :: proc(node: Harvest_Node) {
