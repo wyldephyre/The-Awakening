@@ -1,0 +1,182 @@
+Node_Kind :: enum {
+    SCRAP_PILE;
+    FOOD_CACHE;
+    WATER_SOURCE;
+    METAL_DEPOSIT;
+    FUEL_VENT;
+    CRYSTAL_CLUSTER;
+    ALLOY_VEIN;
+    SHARD_FISSURE;
+    TECH_RUIN;
+    BIO_GROWTH;
+    FRAGMENT_SITE;
+    ESSENCE_WELL;
+}
+
+Node_Kind_Info :: struct {
+    name: string;
+    gather_text: string;
+    resource_type: Resource_Type;
+    zone: int;
+    hits_required: int;
+    color: v4;
+}
+
+g_node_kind_info: [12]Node_Kind_Info;
+g_node_info_initialized: bool;
+
+init_node_kind_info :: proc() {
+    if g_node_info_initialized return;
+    g_node_info_initialized = true;
+
+    set_info(.SCRAP_PILE,       "Scrap Pile",       "Scavenge",  .SALVAGE,            1, 2, {0.7, 0.5, 0.3, 1});
+    set_info(.FOOD_CACHE,       "Food Cache",       "Forage",    .FOOD,               1, 2, {0.5, 0.7, 0.3, 1});
+    set_info(.WATER_SOURCE,     "Water Source",      "Collect",   .WATER,              1, 2, {0.3, 0.5, 0.8, 1});
+    set_info(.METAL_DEPOSIT,    "Metal Deposit",     "Mine",      .SCRAP_METAL,        1, 3, {0.6, 0.6, 0.6, 1});
+    set_info(.FUEL_VENT,        "Fuel Vent",         "Extract",   .FUEL_CELL,          2, 3, {0.8, 0.6, 0.2, 1});
+    set_info(.CRYSTAL_CLUSTER,  "Crystal Cluster",   "Harvest",   .NEXUS_CRYSTAL,      2, 3, {0.4, 0.3, 0.9, 1});
+    set_info(.ALLOY_VEIN,       "Alloy Vein",        "Mine",      .ALLOY_COMPONENT,    2, 4, {0.5, 0.7, 0.7, 1});
+    set_info(.SHARD_FISSURE,    "Shard Fissure",     "Extract",   .VOLATILE_SHARD,     3, 4, {0.9, 0.3, 0.3, 1});
+    set_info(.TECH_RUIN,        "Tech Ruin",         "Salvage",   .FACTION_TECH,       3, 4, {0.3, 0.8, 0.8, 1});
+    set_info(.BIO_GROWTH,       "Bio Growth",        "Harvest",   .RARE_BIOLOGIC,      3, 5, {0.3, 0.9, 0.4, 1});
+    set_info(.FRAGMENT_SITE,    "Fragment Site",      "Extract",   .UMBRALARI_FRAGMENT, 4, 5, {0.6, 0.2, 0.8, 1});
+    set_info(.ESSENCE_WELL,     "Essence Well",      "Channel",   .PURE_NEXUS_ESSENCE, 4, 6, {0.9, 0.8, 1.0, 1});
+}
+
+set_info :: proc(kind: Node_Kind, name: string, gather_text: string, res: Resource_Type, zone: int, hits: int, color: v4) {
+    idx := kind.(int);
+    g_node_kind_info[idx].name = name;
+    g_node_kind_info[idx].gather_text = gather_text;
+    g_node_kind_info[idx].resource_type = res;
+    g_node_kind_info[idx].zone = zone;
+    g_node_kind_info[idx].hits_required = hits;
+    g_node_kind_info[idx].color = color;
+}
+
+get_node_info :: proc(kind: Node_Kind) -> Node_Kind_Info {
+    init_node_kind_info();
+    return g_node_kind_info[kind.(int)];
+}
+
+GATHER_HOLD_TIME :: 0.6;
+NODE_DROP_COUNT_MIN :: 1;
+NODE_DROP_COUNT_MAX :: 3;
+NODE_RESPAWN_TIME :: 30.0;
+
+Harvest_Node :: class : Interactable {
+    kind: Node_Kind;
+    hits_remaining: int;
+    hits_max: int;
+    depleted: bool;
+    depleted_time: float;
+    sprite: Sprite_Renderer;
+    rng: u64;
+
+    ao_start :: method() {
+        this->set_listener(this);
+        rng = rng_seed(entity.id);
+
+        info := get_node_info(kind);
+        this->set_text(format_string("% %", {info.gather_text, info.name}));
+        required_hold_time = GATHER_HOLD_TIME;
+        radius = 1.5;
+        prompt_offset = {0, 0.8};
+
+        hits_max = info.hits_required;
+        hits_remaining = hits_max;
+
+        sprite = entity->get_component(Sprite_Renderer);
+        if sprite != null {
+            sprite.color = info.color;
+        }
+    }
+
+    can_use :: method(player: Player) -> bool {
+        if depleted return false;
+        if player.is_dead return false;
+        return true;
+    }
+
+    on_interact :: method(player: Player) {
+        if depleted return;
+
+        hits_remaining -= 1;
+
+        if hits_remaining <= 0 {
+            harvest_node_drop(this, player);
+            deplete_node(this);
+        } else {
+            Notifier.notify(player, "% (%/%)", {get_node_info(kind).name, hits_max - hits_remaining, hits_max});
+        }
+    }
+
+    on_holding :: method(player: Player) {
+    }
+
+    ao_update :: method(dt: float) {
+        if !depleted return;
+        if !Game.is_server() return;
+
+        if get_time() - depleted_time >= NODE_RESPAWN_TIME {
+            respawn_node(this);
+        }
+    }
+
+    ao_late_update :: method(dt: float) {
+        if depleted return;
+        if hits_remaining >= hits_max return;
+
+        UI.push_world_draw_context();
+        defer UI.pop_draw_context();
+
+        pos := entity.world_position;
+        UI.push_z(pos.y);
+        defer UI.pop_z();
+
+        bar_pos := pos + v2{0, 0.7};
+        bar_rect := Rect{bar_pos, bar_pos}->grow(0.04, 0.35, 0.04, 0.35);
+
+        UI.quad(bar_rect, core_globals.white_sprite, {0, 0, 0, 0.6});
+
+        pct := hits_remaining.(float) / hits_max.(float);
+        if pct > 0 {
+            fill_rect := bar_rect->subrect(0, 0, pct, 1);
+            info := get_node_info(kind);
+            UI.quad(fill_rect, core_globals.white_sprite, info.color);
+        }
+    }
+}
+
+harvest_node_drop :: proc(node: Harvest_Node, player: Player) {
+    if !Game.is_server() return;
+
+    info := get_node_info(node.kind);
+    defn := get_resource_definition(info.resource_type);
+    if defn == null return;
+
+    drop_count := rng_range_int(ref node.rng, NODE_DROP_COUNT_MIN, NODE_DROP_COUNT_MAX);
+
+    for i: 0..drop_count-1 {
+        item := Items.create_item_instance(defn, 1);
+        dropped := Dropped_Item.spawn(node.entity.world_position, item);
+        dropped->set_exclusive(player);
+        dropped->do_spawn_animation(ref node.rng);
+    }
+}
+
+deplete_node :: proc(node: Harvest_Node) {
+    node.depleted = true;
+    node.depleted_time = get_time();
+    if node.sprite != null {
+        node.sprite.color.w = 0.2;
+    }
+}
+
+respawn_node :: proc(node: Harvest_Node) {
+    node.depleted = false;
+    node.hits_remaining = node.hits_max;
+    info := get_node_info(node.kind);
+    if node.sprite != null {
+        node.sprite.color = info.color;
+    }
+}

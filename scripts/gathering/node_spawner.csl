@@ -1,0 +1,109 @@
+MAX_NODES_ZONE_1 :: 8;
+MAX_NODES_ZONE_2 :: 6;
+MAX_NODES_ZONE_3 :: 5;
+MAX_NODES_ZONE_4 :: 3;
+
+NODE_SPAWN_INTERVAL :: 15.0;
+
+g_node_spawn_timer: float;
+g_node_spawner_rng: u64;
+g_node_spawner_initialized: bool;
+
+init_node_spawner :: proc() {
+    g_node_spawner_rng = rng_seed_time();
+    g_node_spawner_initialized = true;
+    try_spawn_nodes();
+}
+
+update_node_spawner :: proc(dt: float) {
+    if !Game.is_server() return;
+    if !g_node_spawner_initialized { init_node_spawner(); }
+
+    g_node_spawn_timer += dt;
+    if g_node_spawn_timer >= NODE_SPAWN_INTERVAL {
+        g_node_spawn_timer -= NODE_SPAWN_INTERVAL;
+        try_spawn_nodes();
+    }
+}
+
+try_spawn_nodes :: proc() {
+    z1 := 0;
+    z2 := 0;
+    z3 := 0;
+    z4 := 0;
+
+    foreach node: component_iterator(Harvest_Node) {
+        info := get_node_info(node.kind);
+        if info.zone == 1 { z1 += 1; }
+        else if info.zone == 2 { z2 += 1; }
+        else if info.zone == 3 { z3 += 1; }
+        else { z4 += 1; }
+    }
+
+    while z1 < MAX_NODES_ZONE_1 {
+        spawn_node_in_zone(1);
+        z1 += 1;
+    }
+    while z2 < MAX_NODES_ZONE_2 {
+        spawn_node_in_zone(2);
+        z2 += 1;
+    }
+    while z3 < MAX_NODES_ZONE_3 {
+        spawn_node_in_zone(3);
+        z3 += 1;
+    }
+    while z4 < MAX_NODES_ZONE_4 {
+        spawn_node_in_zone(4);
+        z4 += 1;
+    }
+}
+
+spawn_node_in_zone :: proc(zone: int) {
+    inner := 0.0;
+    outer := 0.0;
+
+    if zone == 1 { inner = 5.0; outer = ZONE_1_RADIUS - 2.0; }
+    else if zone == 2 { inner = ZONE_1_RADIUS + 2.0; outer = ZONE_2_RADIUS - 2.0; }
+    else if zone == 3 { inner = ZONE_2_RADIUS + 2.0; outer = ZONE_3_RADIUS - 2.0; }
+    else { inner = ZONE_3_RADIUS + 2.0; outer = ZONE_3_RADIUS + 30.0; }
+
+    pos := rng_disk(ref g_node_spawner_rng, inner, outer);
+
+    kind := pick_node_kind_for_zone(zone);
+
+    ent := Scene.create_entity();
+    ent->set_local_position(pos);
+    ent->set_local_scale({0.5, 0.5});
+
+    sprite := ent->add_component(Sprite_Renderer);
+    sprite->set_texture(core_globals.white_sprite);
+    sprite.layer = -1;
+
+    node := ent->add_component(Harvest_Node);
+    node.kind = kind;
+}
+
+pick_node_kind_for_zone :: proc(zone: int) -> Node_Kind {
+    roll := rng_range_int(ref g_node_spawner_rng, 0, 99);
+
+    if zone == 1 {
+        if roll < 30 { return .SCRAP_PILE; }
+        if roll < 55 { return .FOOD_CACHE; }
+        if roll < 80 { return .WATER_SOURCE; }
+        return .METAL_DEPOSIT;
+    }
+    else if zone == 2 {
+        if roll < 35 { return .FUEL_VENT; }
+        if roll < 65 { return .CRYSTAL_CLUSTER; }
+        return .ALLOY_VEIN;
+    }
+    else if zone == 3 {
+        if roll < 35 { return .SHARD_FISSURE; }
+        if roll < 65 { return .TECH_RUIN; }
+        return .BIO_GROWTH;
+    }
+    else {
+        if roll < 50 { return .FRAGMENT_SITE; }
+        return .ESSENCE_WELL;
+    }
+}

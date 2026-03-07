@@ -5,6 +5,7 @@ import "outpost"
 import "crafting"
 import "combat"
 import "enemies"
+import "gathering"
 import "ui"
 
 ao_before_scene_load :: proc() {
@@ -16,6 +17,7 @@ ao_start :: proc() {
 
 ao_update :: proc(dt: float) {
     update_enemy_spawner(dt);
+    update_node_spawner(dt);
     update_damage_numbers(dt);
 }
 
