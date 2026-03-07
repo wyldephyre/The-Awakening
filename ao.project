@@ -1,0 +1,10 @@
+{
+    csl: true
+    projects:
+    [
+        {
+            name: "My Cool Game"
+            id: "69abc6e36a2374002d7404f1"
+        }
+    ]
+}

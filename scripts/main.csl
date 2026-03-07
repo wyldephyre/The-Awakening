@@ -1,0 +1,18 @@
+import "core:ao"
+import "character"
+import "outpost"
+import "crafting"
+import "ui"
+
+ao_before_scene_load :: proc() {
+    register_resources();
+}
+
+ao_start :: proc() {
+}
+
+ao_update :: proc(dt: float) {
+}
+
+ao_late_update :: proc(dt: float) {
+}

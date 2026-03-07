@@ -1,0 +1,17 @@
+ZONE_1_RADIUS :: 30.0;
+ZONE_2_RADIUS :: 60.0;
+ZONE_3_RADIUS :: 100.0;
+
+get_zone :: proc(position: v2) -> int {
+    dist := length(position);
+    if dist <= ZONE_1_RADIUS {
+        return 1;
+    }
+    if dist <= ZONE_2_RADIUS {
+        return 2;
+    }
+    if dist <= ZONE_3_RADIUS {
+        return 3;
+    }
+    return 4;
+}

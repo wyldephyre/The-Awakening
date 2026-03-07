@@ -1,0 +1,157 @@
+POOL_REGEN_INTERVAL :: 10.0;
+INVENTORY_CAPACITY :: 20;
+
+Player :: class : Player_Base {
+    // Stat pools
+    muscle: int;
+    muscle_max: int;
+    spark: int;
+    spark_max: int;
+    edge: int;
+    edge_max: int;
+
+    // Session state
+    is_host: bool;
+    has_build_permission: bool;
+
+    // Character data
+    character_created: bool;
+    character_sentence: Character_Sentence;
+
+    // Internal
+    regen_timer: float;
+
+    ao_start :: method() {
+        // Detect host
+        host_id, has_host := Server.get_private_server_host_id();
+        if has_host {
+            is_host = (this->get_user_id() == host_id);
+            if is_host {
+                has_build_permission = true;
+            }
+        }
+
+        // Set inventory capacity
+        Items.set_capacity(default_inventory, INVENTORY_CAPACITY);
+
+        // Load saved data
+        load_player_data(this);
+    }
+
+    ao_update :: method(dt: float) {
+        if Game.is_server() {
+            regen_timer += dt;
+            if regen_timer >= POOL_REGEN_INTERVAL {
+                regen_timer -= POOL_REGEN_INTERVAL;
+                if muscle < muscle_max {
+                    muscle += 1;
+                }
+                if spark < spark_max {
+                    spark += 1;
+                }
+                if edge < edge_max {
+                    edge += 1;
+                }
+            }
+        }
+    }
+
+    ao_late_update :: method(dt: float) {
+        if this->is_local_or_server() {
+            draw_hud(this);
+
+            hotbar_options := Inventory_Draw_Options.default();
+            hotbar_options.hotbar_item_count = 5;
+            hotbar_options.enable_use_from_hotbar = true;
+            hotbar_options.scroll_item_selection = true;
+            hotbar_options.keyboard_item_selection = true;
+
+            result := Items.draw_hotbar(this, default_inventory, hotbar_options);
+        }
+    }
+
+    ao_end :: method() {
+        if Game.is_server() {
+            save_player_data(this);
+        }
+    }
+
+    ao_can_use_ability :: method(ability: Ability_Base) -> bool {
+        return true;
+    }
+
+    ao_can_use_interactable :: method(interactable: Interactable) -> bool {
+        return true;
+    }
+
+    ao_on_interactable_used :: method(interactable: Interactable) {
+    }
+
+    ao_on_holding_interactable :: method(interactable: Interactable) {
+    }
+
+    ao_on_state_sync :: method() {
+    }
+}
+
+load_player_data :: proc(player: Player) {
+    player.character_created = Save.get_int(player, "character_created", 0) != 0;
+
+    Save.try_get_json(player, "character_sentence", ref player.character_sentence);
+    if player.character_sentence == null {
+        player.character_sentence = new(Character_Sentence);
+    }
+
+    // Base pool max values
+    player.muscle_max = 10;
+    player.spark_max = 10;
+    player.edge_max = 10;
+
+    if player.character_created {
+        apply_type_bonuses(player);
+    }
+
+    // Load current pool values, defaulting to max
+    player.muscle = Save.get_int(player, "muscle", player.muscle_max);
+    player.spark = Save.get_int(player, "spark", player.spark_max);
+    player.edge = Save.get_int(player, "edge", player.edge_max);
+}
+
+apply_type_bonuses :: proc(player: Player) {
+    sentence := player.character_sentence;
+    if sentence == null {
+        return;
+    }
+
+    if sentence.character_type == "Scrapper" {
+        player.muscle_max += 2;
+        player.edge_max += 1;
+    }
+    else if sentence.character_type == "Builder" {
+        player.muscle_max += 1;
+        player.edge_max += 2;
+    }
+    else if sentence.character_type == "Seeker" {
+        player.spark_max += 1;
+        player.edge_max += 2;
+    }
+    else if sentence.character_type == "Weaver" {
+        player.spark_max += 3;
+    }
+}
+
+save_player_data :: proc(player: Player) {
+    created_val := 0;
+    if player.character_created {
+        created_val = 1;
+    }
+    Save.set_int(player, "character_created", created_val);
+
+    if player.character_sentence != null {
+        Save.set_json(player, "character_sentence", ref player.character_sentence);
+    }
+
+    Save.set_int(player, "muscle", player.muscle);
+    Save.set_int(player, "spark", player.spark);
+    Save.set_int(player, "edge", player.edge);
+}

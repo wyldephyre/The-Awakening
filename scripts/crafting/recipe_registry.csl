@@ -1,0 +1,71 @@
+Resource_Type :: enum {
+    SALVAGE;
+    FOOD;
+    WATER;
+    SCRAP_METAL;
+    FUEL_CELL;
+    NEXUS_CRYSTAL;
+    ALLOY_COMPONENT;
+    VOLATILE_SHARD;
+    FACTION_TECH;
+    RARE_BIOLOGIC;
+    UMBRALARI_FRAGMENT;
+    PURE_NEXUS_ESSENCE;
+}
+
+Resource_Definition :: class : Item_Definition {
+    resource_type: Resource_Type;
+    resource_tier: int;
+}
+
+all_resource_definitions: [..]Item_Definition;
+
+register_resources :: proc() {
+    // Tier 1 - Zone 1
+    register_resource("salvage", "Salvage", .SALVAGE, 1);
+    register_resource("food", "Food", .FOOD, 1);
+    register_resource("water", "Water", .WATER, 1);
+    register_resource("scrap_metal", "Scrap Metal", .SCRAP_METAL, 1);
+
+    // Tier 2 - Zone 2
+    register_resource("fuel_cell", "Fuel Cell", .FUEL_CELL, 2);
+    register_resource("nexus_crystal", "Nexus Crystal", .NEXUS_CRYSTAL, 2);
+    register_resource("alloy_component", "Alloy Component", .ALLOY_COMPONENT, 2);
+
+    // Tier 3 - Zone 3
+    register_resource("volatile_shard", "Volatile Shard", .VOLATILE_SHARD, 3);
+    register_resource("faction_tech", "Faction Tech", .FACTION_TECH, 3);
+    register_resource("rare_biologic", "Rare Biologic", .RARE_BIOLOGIC, 3);
+
+    // Tier 4 - Zone 4+
+    register_resource("umbralari_fragment", "Umbralari Fragment", .UMBRALARI_FRAGMENT, 4);
+    register_resource("pure_nexus_essence", "Pure Nexus Essence", .PURE_NEXUS_ESSENCE, 4);
+}
+
+resource_tier_to_item_tier :: proc(resource_tier: int) -> Item_Tier {
+    if resource_tier == 1 { return .COMMON; }
+    if resource_tier == 2 { return .UNCOMMON; }
+    if resource_tier == 3 { return .RARE; }
+    if resource_tier == 4 { return .EPIC; }
+    return .COMMON;
+}
+
+register_resource :: proc(id: string, name: string, res_type: Resource_Type, resource_tier: int) {
+    desc: Item_Definition_Desc = {id, name, null, 99, resource_tier_to_item_tier(resource_tier)};
+    defn := Items.register_item_definition(desc, Resource_Definition, Item_Instance);
+    defn.resource_type = res_type;
+    defn.resource_tier = resource_tier;
+    all_resource_definitions->append(defn);
+}
+
+get_resource_definition :: proc(res_type: Resource_Type) -> Resource_Definition {
+    for defn: all_resource_definitions {
+        res_defn := defn.(Resource_Definition);
+        if res_defn != null {
+            if res_defn.resource_type == res_type {
+                return res_defn;
+            }
+        }
+    }
+    return null;
+}

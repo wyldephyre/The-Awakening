@@ -1,0 +1,5 @@
+Character_Sentence :: class {
+    descriptor: string @ao_serialize;
+    character_type: string @ao_serialize;
+    focus: string @ao_serialize;
+}
