@@ -245,4 +245,5 @@ complete_character_creation :: proc(player: Player) {
     player.edge = player.edge_max;
 
     save_player_data(player);
+    init_player_outpost(player);
 }

@@ -10,6 +10,7 @@ import "ui"
 
 ao_before_scene_load :: proc() {
     register_resources();
+    register_structure_defs();
 }
 
 ao_start :: proc() {

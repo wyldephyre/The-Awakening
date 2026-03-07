@@ -1,0 +1,294 @@
+BUILD_PANEL_WIDTH :: 240;
+
+draw_build_mode :: proc(player: Player) {
+    if player.outpost == null return;
+
+    UI.push_layer_relative(40);
+    defer UI.pop_layer();
+
+    safe := UI.get_safe_screen_rect();
+
+    // Left panel - structure selector
+    panel := safe->left_rect()->grow(0, BUILD_PANEL_WIDTH, 0, 0)->inset(10);
+    UI.quad(panel, core_globals.white_sprite, {0.08, 0.08, 0.12, 0.85});
+
+    header := panel->cut_top(50);
+    ts := UI.default_text_settings();
+    ts.size = 36;
+    ts.color = {1, 1, 1, 1};
+    ts.halign = .CENTER;
+    ts.valign = .CENTER;
+    ts.do_outline = true;
+    ts.outline_thickness = 2;
+    ts.outline_color = {0, 0, 0, 1};
+    UI.text(header, ts, "Build Mode");
+
+    panel->cut_top(8);
+
+    // Structure count
+    count_rect := panel->cut_top(30);
+    ts.size = 24;
+    ts.color = {0.7, 0.7, 0.7, 1};
+    count := player.outpost.data.structures.count;
+    UI.text(count_rect, ts, "Structures: %/%", {count, MAX_STRUCTURES});
+
+    panel->cut_top(8);
+
+    // Structure buttons
+    bs := UI.default_button_settings();
+    bs.press_scaling = 0.35;
+    btn_ts := UI.default_text_settings();
+    btn_ts.size = 26;
+    btn_ts.color = {1, 1, 1, 1};
+
+    for i: 0..all_structure_defs.count-1 {
+        UI.push_id("build_%", {i});
+        defer UI.pop_id();
+
+        def := all_structure_defs[i];
+        btn_rect := panel->cut_top(65);
+        panel->cut_top(4);
+
+        draw_structure_button(player, btn_rect, def, i);
+    }
+
+    panel->cut_top(16);
+
+    // Close button
+    close_rect := panel->cut_top(50)->inset(0, 20, 0, 20);
+    bs.sprite = get_asset(Texture_Asset, "$AO/new/modal/buttons_2/button_3.png");
+    if UI.button(close_rect, bs, btn_ts, "Close").clicked {
+        player.build_mode = false;
+        player.build_selected = -1;
+    }
+
+    // Ghost preview at tap position
+    if player.build_selected >= 0 {
+        draw_build_ghost(player);
+        handle_build_placement(player);
+    }
+
+    // Existing structures list (right side for upgrade/remove)
+    if player.outpost.data.structures.count > 0 {
+        draw_structure_list(player);
+    }
+}
+
+draw_structure_button :: proc(player: Player, rect: Rect, def: Structure_Def, index: int) {
+    is_selected := player.build_selected == index;
+    can_build := can_afford_structure(player, def.kind, 0);
+    at_max := player.outpost.data.structures.count >= MAX_STRUCTURES;
+
+    bs := UI.default_button_settings();
+    bs.press_scaling = 0.35;
+
+    if is_selected {
+        bs.sprite = get_asset(Texture_Asset, "$AO/new/modal/buttons_2/button_5.png");
+    } else if can_build && !at_max {
+        bs.sprite = get_asset(Texture_Asset, "$AO/new/modal/buttons_2/button_2.png");
+    } else {
+        bs.sprite = get_asset(Texture_Asset, "$AO/new/modal/buttons_2/button_8.png");
+    }
+
+    ts := UI.default_text_settings();
+    ts.size = 26;
+    ts.color = {1, 1, 1, 1};
+
+    result := UI.begin_button(rect, bs, ts, ""); {
+        defer UI.end_button();
+
+        content := result.rect->inset(6);
+        name_rect := content->cut_top(28);
+
+        ts.halign = .LEFT;
+        ts.valign = .CENTER;
+        UI.text(name_rect, ts, def.name);
+
+        // Cost display
+        ts.size = 20;
+        cost_rect := content;
+        layout := UI.make_directional_layout(cost_rect, .RIGHT);
+
+        if def.costs[0].count > 0 {
+            for ing: def.costs[0] {
+                res_defn := get_resource_definition(ing.resource_type);
+                if res_defn == null continue;
+
+                have := count_resource_in_inventory(player, ing.resource_type);
+                if have >= ing.amount {
+                    ts.color = {0.5, 1.0, 0.5, 1};
+                } else {
+                    ts.color = {1.0, 0.4, 0.4, 1};
+                }
+
+                label := format_string("%:%/%", {res_defn->get_name(), have, ing.amount});
+                chip_w := label.count.(int) * 7 + 8;
+                UI.text(layout->next(chip_w), ts, label);
+            }
+        }
+    }
+
+    if result.clicked {
+        if is_selected {
+            player.build_selected = -1;
+        } else if can_build && !at_max {
+            player.build_selected = index;
+        }
+    }
+}
+
+draw_build_ghost :: proc(player: Player) {
+    if player.outpost == null return;
+
+    mouse_world := screen_to_world(get_mouse_screen_position());
+    center := v2{player.outpost.data.center_x, player.outpost.data.center_y};
+    rel := mouse_world - center;
+
+    gx := (rel.x / OUTPOST_GRID_SIZE + 0.5).(int);
+    gy := (rel.y / OUTPOST_GRID_SIZE + 0.5).(int);
+
+    snap_x := center.x + gx.(float) * OUTPOST_GRID_SIZE;
+    snap_y := center.y + gy.(float) * OUTPOST_GRID_SIZE;
+
+    valid := is_within_plot(gx, gy) && !is_grid_occupied(player, gx, gy);
+
+    UI.push_world_draw_context();
+    defer UI.pop_draw_context();
+
+    UI.push_z(snap_y);
+    defer UI.pop_z();
+
+    ghost_pos := v2{snap_x, snap_y};
+    ghost_rect := Rect{ghost_pos, ghost_pos}->grow(0.4, 0.4, 0.4, 0.4);
+
+    ghost_color := v4{0.3, 1.0, 0.3, 0.4};
+    if !valid {
+        ghost_color = {1.0, 0.3, 0.3, 0.4};
+    }
+    UI.quad(ghost_rect, core_globals.white_sprite, ghost_color);
+}
+
+handle_build_placement :: proc(player: Player) {
+    if player.outpost == null return;
+    if player.build_selected < 0 return;
+
+    mouse_world := screen_to_world(get_mouse_screen_position());
+    center := v2{player.outpost.data.center_x, player.outpost.data.center_y};
+    rel := mouse_world - center;
+
+    gx := (rel.x / OUTPOST_GRID_SIZE + 0.5).(int);
+    gy := (rel.y / OUTPOST_GRID_SIZE + 0.5).(int);
+
+    // Check for tap in world area (not on UI panel)
+    mouse_screen := get_mouse_screen_position();
+    screen := UI.get_screen_rect();
+    panel_edge := screen.min.x + BUILD_PANEL_WIDTH.(float) * UI.get_current_scale_factor() + 20;
+
+    if mouse_screen.x > panel_edge {
+        if UI.consume_click() {
+            def := get_structure_def_by_index(player.build_selected);
+            if def != null {
+                place_structure(player, def.kind, gx, gy);
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Existing structures list (upgrade / remove)
+// ---------------------------------------------------------------------------
+
+draw_structure_list :: proc(player: Player) {
+    safe := UI.get_safe_screen_rect();
+    panel := safe->right_rect()->grow(0, 0, 0, 220)->inset(10);
+    UI.quad(panel, core_globals.white_sprite, {0.08, 0.08, 0.12, 0.85});
+
+    header := panel->cut_top(40);
+    ts := UI.default_text_settings();
+    ts.size = 30;
+    ts.color = {1, 1, 1, 1};
+    ts.halign = .CENTER;
+    ts.valign = .CENTER;
+    ts.do_outline = true;
+    ts.outline_thickness = 2;
+    ts.outline_color = {0, 0, 0, 1};
+    UI.text(header, ts, "Structures");
+
+    panel->cut_top(6);
+
+    for i: 0..player.outpost.data.structures.count-1 {
+        UI.push_id("struct_%", {i});
+        defer UI.pop_id();
+
+        placed := player.outpost.data.structures[i];
+        def := get_structure_def_by_index(placed.kind_index);
+        if def == null continue;
+
+        row := panel->cut_top(60);
+        panel->cut_top(3);
+
+        draw_structure_list_row(player, row, placed, def, i);
+    }
+}
+
+draw_structure_list_row :: proc(player: Player, row: Rect, placed: Placed_Structure, def: Structure_Def, index: int) {
+    UI.quad(row, core_globals.white_sprite, {0.12, 0.12, 0.16, 0.8});
+
+    // Tier pip
+    pip := row->cut_left(6);
+    UI.quad(pip, core_globals.white_sprite, get_structure_color(def.kind));
+
+    content := row->inset(4);
+
+    // Buttons on right
+    btn_area := content->cut_right(90);
+    bs := UI.default_button_settings();
+    bs.press_scaling = 0.35;
+    btn_ts := UI.default_text_settings();
+    btn_ts.size = 20;
+    btn_ts.color = {1, 1, 1, 1};
+
+    // Upgrade button
+    upgrade_rect := btn_area->cut_top(26);
+    can_up := placed.level < def.max_level && can_afford_structure(player, def.kind, placed.level);
+    if can_up {
+        bs.sprite = get_asset(Texture_Asset, "$AO/new/modal/buttons_2/button_2.png");
+    } else {
+        bs.sprite = get_asset(Texture_Asset, "$AO/new/modal/buttons_2/button_8.png");
+    }
+    UI.push_disabled(!can_up);
+    if UI.button(upgrade_rect, bs, btn_ts, "Upgrade").clicked {
+        upgrade_structure(player, index);
+    }
+    UI.pop_disabled();
+
+    btn_area->cut_top(3);
+
+    // Remove button
+    remove_rect := btn_area->cut_top(26);
+    bs.sprite = get_asset(Texture_Asset, "$AO/new/modal/buttons_2/button_3.png");
+    if UI.button(remove_rect, bs, btn_ts, "Remove").clicked {
+        remove_structure(player, index);
+    }
+
+    // Name + level
+    ts := UI.default_text_settings();
+    ts.size = 24;
+    ts.color = {1, 1, 1, 1};
+    ts.halign = .LEFT;
+    ts.valign = .TOP;
+    ts.do_outline = true;
+    ts.outline_thickness = 1;
+    ts.outline_color = {0, 0, 0, 1};
+
+    name_rect := content->cut_top(26);
+    UI.text(name_rect, ts, "% Lv%", {def.name, placed.level});
+
+    // HP
+    ts.size = 20;
+    ts.color = {0.7, 0.7, 0.7, 1};
+    lvl_idx := placed.level - 1;
+    if lvl_idx < 0 { lvl_idx = 0; }
+    max_hp := def.levels[lvl_idx].hp;
+    UI.text(content, ts, "HP: %/%", {placed.hp, max_hp});
+}

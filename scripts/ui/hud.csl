@@ -37,6 +37,26 @@ draw_hud :: proc(player: Player) {
     craft_ts.color = {1, 1, 1, 1};
     if UI.button(craft_rect, craft_bs, craft_ts, "Craft").clicked {
         player.crafting_open = !player.crafting_open;
+        player.build_mode = false;
+    }
+
+    // Build button - right side under craft
+    build_rect := safe->top_right_rect()->grow(0, 0, 37, 105)->offset(-20, -130);
+    build_bs := UI.default_button_settings();
+    build_bs.press_scaling = 0.35;
+    build_ts := UI.default_text_settings();
+    build_ts.size = 30;
+    build_ts.color = {1, 1, 1, 1};
+
+    if player.build_mode {
+        build_bs.sprite = get_asset(Texture_Asset, "$AO/new/modal/buttons_2/button_5.png");
+    } else {
+        build_bs.sprite = get_asset(Texture_Asset, "$AO/new/modal/buttons_2/button_9.png");
+    }
+    if UI.button(build_rect, build_bs, build_ts, "Build").clicked {
+        player.build_mode = !player.build_mode;
+        player.build_selected = -1;
+        player.crafting_open = false;
     }
 }
 

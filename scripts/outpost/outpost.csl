@@ -1,0 +1,417 @@
+OUTPOST_GRID_SIZE :: 2.0;
+OUTPOST_PLOT_RADIUS :: 8.0;
+MAX_STRUCTURES :: 12;
+
+Structure_Kind :: enum {
+    WALL;
+    WATCHTOWER;
+    WORKSHOP;
+    STORAGE;
+}
+
+STRUCTURE_COUNT :: 4;
+
+Structure_Level_Data :: struct {
+    hp: int;
+    bonus: int;
+}
+
+Structure_Def :: class {
+    kind: Structure_Kind;
+    name: string;
+    max_level: int;
+    costs: [3][..]Recipe_Ingredient;
+    levels: [3]Structure_Level_Data;
+}
+
+all_structure_defs: [..]Structure_Def;
+
+register_structure_defs :: proc() {
+    // Wall - defensive barrier
+    wall := new(Structure_Def);
+    wall.kind = .WALL;
+    wall.name = "Wall";
+    wall.max_level = 3;
+    wall.levels[0] = Structure_Level_Data{50, 0};
+    wall.levels[1] = Structure_Level_Data{100, 0};
+    wall.levels[2] = Structure_Level_Data{200, 0};
+    wall.costs[0]->append(Recipe_Ingredient{.SALVAGE, 5});
+    wall.costs[0]->append(Recipe_Ingredient{.SCRAP_METAL, 3});
+    wall.costs[1]->append(Recipe_Ingredient{.SCRAP_METAL, 6});
+    wall.costs[1]->append(Recipe_Ingredient{.ALLOY_COMPONENT, 2});
+    wall.costs[2]->append(Recipe_Ingredient{.ALLOY_COMPONENT, 5});
+    wall.costs[2]->append(Recipe_Ingredient{.FACTION_TECH, 2});
+    all_structure_defs->append(wall);
+
+    // Watchtower - increases nearby detection range
+    tower := new(Structure_Def);
+    tower.kind = .WATCHTOWER;
+    tower.name = "Watchtower";
+    tower.max_level = 3;
+    tower.levels[0] = Structure_Level_Data{30, 5};
+    tower.levels[1] = Structure_Level_Data{60, 8};
+    tower.levels[2] = Structure_Level_Data{100, 12};
+    tower.costs[0]->append(Recipe_Ingredient{.SALVAGE, 4});
+    tower.costs[0]->append(Recipe_Ingredient{.WATER, 2});
+    tower.costs[1]->append(Recipe_Ingredient{.FUEL_CELL, 3});
+    tower.costs[1]->append(Recipe_Ingredient{.NEXUS_CRYSTAL, 2});
+    tower.costs[2]->append(Recipe_Ingredient{.VOLATILE_SHARD, 2});
+    tower.costs[2]->append(Recipe_Ingredient{.FACTION_TECH, 3});
+    all_structure_defs->append(tower);
+
+    // Workshop - reduces crafting cost or unlocks recipes
+    workshop := new(Structure_Def);
+    workshop.kind = .WORKSHOP;
+    workshop.name = "Workshop";
+    workshop.max_level = 3;
+    workshop.levels[0] = Structure_Level_Data{40, 1};
+    workshop.levels[1] = Structure_Level_Data{80, 2};
+    workshop.levels[2] = Structure_Level_Data{120, 3};
+    workshop.costs[0]->append(Recipe_Ingredient{.SCRAP_METAL, 5});
+    workshop.costs[0]->append(Recipe_Ingredient{.FOOD, 3});
+    workshop.costs[1]->append(Recipe_Ingredient{.ALLOY_COMPONENT, 4});
+    workshop.costs[1]->append(Recipe_Ingredient{.FUEL_CELL, 3});
+    workshop.costs[2]->append(Recipe_Ingredient{.FACTION_TECH, 4});
+    workshop.costs[2]->append(Recipe_Ingredient{.RARE_BIOLOGIC, 2});
+    all_structure_defs->append(workshop);
+
+    // Storage - expands inventory capacity
+    storage := new(Structure_Def);
+    storage.kind = .STORAGE;
+    storage.name = "Storage";
+    storage.max_level = 3;
+    storage.levels[0] = Structure_Level_Data{35, 5};
+    storage.levels[1] = Structure_Level_Data{70, 10};
+    storage.levels[2] = Structure_Level_Data{100, 15};
+    storage.costs[0]->append(Recipe_Ingredient{.SALVAGE, 6});
+    storage.costs[0]->append(Recipe_Ingredient{.FOOD, 2});
+    storage.costs[1]->append(Recipe_Ingredient{.SCRAP_METAL, 5});
+    storage.costs[1]->append(Recipe_Ingredient{.NEXUS_CRYSTAL, 3});
+    storage.costs[2]->append(Recipe_Ingredient{.ALLOY_COMPONENT, 4});
+    storage.costs[2]->append(Recipe_Ingredient{.VOLATILE_SHARD, 3});
+    all_structure_defs->append(storage);
+}
+
+get_structure_def :: proc(kind: Structure_Kind) -> Structure_Def {
+    for def: all_structure_defs {
+        if def.kind == kind return def;
+    }
+    return null;
+}
+
+// ---------------------------------------------------------------------------
+// Placed structure data (serializable for save)
+// ---------------------------------------------------------------------------
+
+Placed_Structure :: class {
+    kind_index: int @ao_serialize;
+    level: int @ao_serialize;
+    grid_x: int @ao_serialize;
+    grid_y: int @ao_serialize;
+    hp: int @ao_serialize;
+}
+
+Outpost_Data :: class {
+    version: int @ao_serialize;
+    center_x: float @ao_serialize;
+    center_y: float @ao_serialize;
+    structures: [..]Placed_Structure @ao_serialize;
+}
+
+OUTPOST_SAVE_VERSION :: 1;
+
+// ---------------------------------------------------------------------------
+// Per-player outpost runtime state
+// ---------------------------------------------------------------------------
+
+Player_Outpost :: class {
+    data: Outpost_Data;
+    entities: [..]Entity;
+    initialized: bool;
+}
+
+init_player_outpost :: proc(player: Player) {
+    if player.outpost == null {
+        player.outpost = new(Player_Outpost);
+    }
+    outpost := player.outpost;
+
+    outpost.data = new(Outpost_Data);
+    if !Save.try_get_json(player, "outpost_data", ref outpost.data) {
+        outpost.data = new(Outpost_Data);
+        outpost.data.version = OUTPOST_SAVE_VERSION;
+        // Place outpost near player spawn offset by player id hash
+        rng: u64 = rng_seed(player.entity.id);
+        angle := rng_range_float(ref rng, 0, 6.28);
+        dist := rng_range_float(ref rng, 8, 15);
+        outpost.data.center_x = cos(angle) * dist;
+        outpost.data.center_y = sin(angle) * dist;
+    }
+
+    rebuild_outpost_entities(player);
+    apply_outpost_bonuses(player);
+    outpost.initialized = true;
+}
+
+save_outpost :: proc(player: Player) {
+    if player.outpost == null return;
+    Save.set_json(player, "outpost_data", ref player.outpost.data);
+}
+
+// ---------------------------------------------------------------------------
+// Entity management
+// ---------------------------------------------------------------------------
+
+rebuild_outpost_entities :: proc(player: Player) {
+    outpost := player.outpost;
+    if outpost == null return;
+
+    // Destroy old entities
+    for ent: outpost.entities {
+        if ent != null {
+            ent->destroy();
+        }
+    }
+    outpost.entities->clear();
+
+    // Spawn entities for each structure
+    for placed: outpost.data.structures {
+        spawn_structure_entity(outpost, placed);
+    }
+}
+
+spawn_structure_entity :: proc(outpost: Player_Outpost, placed: Placed_Structure) {
+    ent := Scene.create_entity();
+    world_x := outpost.data.center_x + placed.grid_x.(float) * OUTPOST_GRID_SIZE;
+    world_y := outpost.data.center_y + placed.grid_y.(float) * OUTPOST_GRID_SIZE;
+    ent->set_local_position({world_x, world_y});
+
+    sprite := ent->add_component(Sprite_Renderer);
+    sprite->set_texture(core_globals.white_sprite);
+    sprite.depth_offset = 0.0;
+
+    def := get_structure_def_by_index(placed.kind_index);
+    if def != null {
+        color := get_structure_color(def.kind);
+        scale_val := 0.8 + placed.level.(float) * 0.3;
+        sprite.color = color;
+        ent->set_local_scale({scale_val, scale_val});
+    }
+
+    outpost.entities->append(ent);
+}
+
+get_structure_def_by_index :: proc(index: int) -> Structure_Def {
+    if index < 0 return null;
+    if index >= all_structure_defs.count return null;
+    return all_structure_defs[index];
+}
+
+get_structure_color :: proc(kind: Structure_Kind) -> v4 {
+    switch kind {
+        case .WALL:       return {0.5, 0.5, 0.5, 1.0};
+        case .WATCHTOWER: return {0.3, 0.6, 0.9, 1.0};
+        case .WORKSHOP:   return {0.9, 0.6, 0.2, 1.0};
+        case .STORAGE:    return {0.4, 0.8, 0.4, 1.0};
+    }
+    return {1, 1, 1, 1};
+}
+
+get_kind_index :: proc(kind: Structure_Kind) -> int {
+    switch kind {
+        case .WALL:       return 0;
+        case .WATCHTOWER: return 1;
+        case .WORKSHOP:   return 2;
+        case .STORAGE:    return 3;
+    }
+    return 0;
+}
+
+// ---------------------------------------------------------------------------
+// Build / upgrade / remove
+// ---------------------------------------------------------------------------
+
+can_afford_structure :: proc(player: Player, kind: Structure_Kind, level: int) -> bool {
+    def := get_structure_def(kind);
+    if def == null return false;
+    if level < 0 return false;
+    if level >= def.max_level return false;
+
+    for ing: def.costs[level] {
+        have := count_resource_in_inventory(player, ing.resource_type);
+        if have < ing.amount return false;
+    }
+    return true;
+}
+
+spend_structure_cost :: proc(player: Player, kind: Structure_Kind, level: int) {
+    def := get_structure_def(kind);
+    if def == null return;
+    for ing: def.costs[level] {
+        remaining := ing.amount;
+        for i: 0..player.default_inventory.capacity-1 {
+            if remaining <= 0 break;
+            item := player.default_inventory->get_item(i);
+            if item == null continue;
+            defn := item->get_definition();
+            res_defn := defn.(Resource_Definition);
+            if res_defn == null continue;
+            if res_defn.resource_type != ing.resource_type continue;
+
+            stack := item.count.(int);
+            if stack <= remaining {
+                remaining -= stack;
+                Items.destroy_item_instance(item);
+            } else {
+                Items.destroy_item_instance(item, remaining.(s64));
+                remaining = 0;
+            }
+        }
+    }
+}
+
+is_grid_occupied :: proc(player: Player, gx: int, gy: int) -> bool {
+    if player.outpost == null return false;
+    for placed: player.outpost.data.structures {
+        if placed.grid_x == gx {
+            if placed.grid_y == gy {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+is_within_plot :: proc(gx: int, gy: int) -> bool {
+    dist := sqrt(gx.(float) * gx.(float) + gy.(float) * gy.(float)) * OUTPOST_GRID_SIZE;
+    return dist <= OUTPOST_PLOT_RADIUS;
+}
+
+place_structure :: proc(player: Player, kind: Structure_Kind, gx: int, gy: int) -> bool {
+    if player.outpost == null return false;
+    if player.outpost.data.structures.count >= MAX_STRUCTURES return false;
+    if !is_within_plot(gx, gy) return false;
+    if is_grid_occupied(player, gx, gy) return false;
+    if !can_afford_structure(player, kind, 0) return false;
+
+    spend_structure_cost(player, kind, 0);
+
+    placed := new(Placed_Structure);
+    placed.kind_index = get_kind_index(kind);
+    placed.level = 1;
+    def := get_structure_def(kind);
+    if def != null {
+        placed.hp = def.levels[0].hp;
+    }
+    placed.grid_x = gx;
+    placed.grid_y = gy;
+
+    player.outpost.data.structures->append(placed);
+    spawn_structure_entity(player.outpost, placed);
+    apply_outpost_bonuses(player);
+    save_outpost(player);
+
+    Notifier.notify(player, format_string("Built %!", {def.name}));
+    return true;
+}
+
+upgrade_structure :: proc(player: Player, index: int) -> bool {
+    if player.outpost == null return false;
+    if index < 0 return false;
+    if index >= player.outpost.data.structures.count return false;
+
+    placed := player.outpost.data.structures[index];
+    def := get_structure_def_by_index(placed.kind_index);
+    if def == null return false;
+    if placed.level >= def.max_level return false;
+
+    next_level := placed.level;
+    if !can_afford_structure(player, def.kind, next_level) return false;
+
+    spend_structure_cost(player, def.kind, next_level);
+    placed.level += 1;
+    placed.hp = def.levels[placed.level - 1].hp;
+
+    rebuild_outpost_entities(player);
+    apply_outpost_bonuses(player);
+    save_outpost(player);
+
+    Notifier.notify(player, format_string("Upgraded % to Lv%!", {def.name, placed.level}));
+    return true;
+}
+
+remove_structure :: proc(player: Player, index: int) -> bool {
+    if player.outpost == null return false;
+    if index < 0 return false;
+    if index >= player.outpost.data.structures.count return false;
+
+    player.outpost.data.structures->unordered_remove_by_index(index);
+    rebuild_outpost_entities(player);
+    apply_outpost_bonuses(player);
+    save_outpost(player);
+    return true;
+}
+
+// ---------------------------------------------------------------------------
+// Bonus calculation
+// ---------------------------------------------------------------------------
+
+apply_outpost_bonuses :: proc(player: Player) {
+    if player.outpost == null return;
+    extra_capacity := 0;
+
+    for placed: player.outpost.data.structures {
+        def := get_structure_def_by_index(placed.kind_index);
+        if def == null continue;
+        if def.kind == .STORAGE {
+            lvl_idx := placed.level - 1;
+            if lvl_idx < 0 { lvl_idx = 0; }
+            extra_capacity += def.levels[lvl_idx].bonus;
+        }
+    }
+
+    Items.set_capacity(player.default_inventory, INVENTORY_CAPACITY + extra_capacity.(s64));
+}
+
+// ---------------------------------------------------------------------------
+// World-space outpost visualization
+// ---------------------------------------------------------------------------
+
+draw_outpost_world :: proc(player: Player) {
+    if player.outpost == null return;
+    if !player.outpost.initialized return;
+
+    UI.push_world_draw_context();
+    defer UI.pop_draw_context();
+
+    center := v2{player.outpost.data.center_x, player.outpost.data.center_y};
+
+    UI.push_z(center.y - 0.5);
+    defer UI.pop_z();
+
+    // Plot boundary circle (faint ring)
+    ring_rect := Rect{center, center}->grow(0.05, OUTPOST_PLOT_RADIUS, 0.05, OUTPOST_PLOT_RADIUS);
+    UI.quad(ring_rect, core_globals.white_sprite, {0.3, 0.6, 1.0, 0.08});
+
+    // Labels above structures
+    ts := UI.default_text_settings();
+    ts.size = 0.25;
+    ts.color = {1, 1, 1, 0.8};
+    ts.halign = .CENTER;
+    ts.valign = .BOTTOM;
+    ts.do_outline = true;
+    ts.outline_thickness = 1;
+    ts.outline_color = {0, 0, 0, 0.6};
+
+    for placed: player.outpost.data.structures {
+        def := get_structure_def_by_index(placed.kind_index);
+        if def == null continue;
+
+        wx := player.outpost.data.center_x + placed.grid_x.(float) * OUTPOST_GRID_SIZE;
+        wy := player.outpost.data.center_y + placed.grid_y.(float) * OUTPOST_GRID_SIZE;
+        label_pos := v2{wx, wy + 1.0};
+        label_rect := Rect{label_pos, label_pos}->grow(0.15, 1.5, 0.0, 1.5);
+
+        UI.text(label_rect, ts, "% Lv%", {def.name, placed.level});
+    }
+}

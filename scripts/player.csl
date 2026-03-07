@@ -28,6 +28,11 @@ Player :: class : Player_Base {
 
     // UI state
     crafting_open: bool;
+    build_mode: bool;
+    build_selected: int;
+
+    // Outpost
+    outpost: Player_Outpost;
 
     // Internal
     regen_timer: float;
@@ -50,6 +55,12 @@ Player :: class : Player_Base {
 
         if !character_created {
             this->add_freeze_reason("character_creation");
+        }
+
+        build_selected = -1;
+
+        if character_created {
+            init_player_outpost(this);
         }
     }
 
@@ -102,6 +113,12 @@ Player :: class : Player_Base {
                 if crafting_open {
                     draw_crafting_panel(this);
                 }
+
+                if build_mode {
+                    draw_build_mode(this);
+                }
+
+                draw_outpost_world(this);
             }
         }
     }
@@ -109,6 +126,7 @@ Player :: class : Player_Base {
     ao_end :: method() {
         if Game.is_server() {
             save_player_data(this);
+            save_outpost(this);
         }
     }
 
