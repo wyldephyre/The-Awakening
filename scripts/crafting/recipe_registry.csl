@@ -1,3 +1,7 @@
+// ---------------------------------------------------------------------------
+// Resources
+// ---------------------------------------------------------------------------
+
 Resource_Type :: enum {
     SALVAGE;
     FOOD;
@@ -40,6 +44,8 @@ register_resources :: proc() {
     // Tier 4 - Zone 4+
     register_resource("umbralari_fragment", "Umbralari Fragment", .UMBRALARI_FRAGMENT, 4);
     register_resource("pure_nexus_essence", "Pure Nexus Essence", .PURE_NEXUS_ESSENCE, 4);
+
+    register_recipes();
 }
 
 resource_tier_to_item_tier :: proc(resource_tier: int) -> Item_Tier {
@@ -68,4 +74,216 @@ get_resource_definition :: proc(res_type: Resource_Type) -> Resource_Definition 
         }
     }
     return null;
+}
+
+// ---------------------------------------------------------------------------
+// Recipes
+// ---------------------------------------------------------------------------
+
+Recipe_Ingredient :: struct {
+    resource_type: Resource_Type;
+    amount: int;
+}
+
+Recipe :: class {
+    id: string;
+    name: string;
+    tier: int;
+    ingredients: [..]Recipe_Ingredient;
+    result_type: Recipe_Result_Type;
+    result_value: int;
+    description: string;
+}
+
+Recipe_Result_Type :: enum {
+    HEAL;
+    BUFF_MUSCLE;
+    BUFF_SPARK;
+    BUFF_EDGE;
+    SHIELD;
+    REPAIR_KIT;
+}
+
+all_recipes: [..]Recipe;
+
+register_recipes :: proc() {
+    // -- Tier 1 --
+    add_recipe("ration_pack", "Ration Pack", 1, .HEAL, 30,
+        "Restores 30 HP.",
+        .FOOD, 3, .WATER, 2, .SALVAGE, 0, .SCRAP_METAL, 0);
+
+    add_recipe("patch_kit", "Patch Kit", 1, .REPAIR_KIT, 20,
+        "Restores 20 HP and clears damage.",
+        .SCRAP_METAL, 3, .SALVAGE, 2, .FOOD, 0, .WATER, 0);
+
+    add_recipe("muscle_stim", "Muscle Stim", 1, .BUFF_MUSCLE, 3,
+        "Restores 3 Muscle.",
+        .FOOD, 2, .SALVAGE, 2, .WATER, 1, .SCRAP_METAL, 0);
+
+    add_recipe("spark_cell", "Spark Cell", 1, .BUFF_SPARK, 3,
+        "Restores 3 Spark.",
+        .SCRAP_METAL, 2, .WATER, 2, .SALVAGE, 1, .FOOD, 0);
+
+    // -- Tier 2 --
+    add_recipe("fuel_ration", "Fuel Ration", 2, .HEAL, 60,
+        "Restores 60 HP.",
+        .FUEL_CELL, 2, .FOOD, 3, .NEXUS_CRYSTAL, 0, .ALLOY_COMPONENT, 0);
+
+    add_recipe("alloy_shield", "Alloy Shield", 2, .SHIELD, 25,
+        "Grants 25 temporary shield.",
+        .ALLOY_COMPONENT, 3, .SCRAP_METAL, 2, .FUEL_CELL, 0, .NEXUS_CRYSTAL, 0);
+
+    add_recipe("edge_booster", "Edge Booster", 2, .BUFF_EDGE, 3,
+        "Restores 3 Edge.",
+        .NEXUS_CRYSTAL, 2, .ALLOY_COMPONENT, 1, .FUEL_CELL, 1, .FOOD, 0);
+
+    // -- Tier 3 --
+    add_recipe("volatile_salve", "Volatile Salve", 3, .HEAL, 100,
+        "Restores 100 HP.",
+        .RARE_BIOLOGIC, 2, .VOLATILE_SHARD, 1, .FACTION_TECH, 1, .FOOD, 0);
+
+    add_recipe("faction_enhancer", "Faction Enhancer", 3, .BUFF_MUSCLE, 5,
+        "Restores 5 Muscle.",
+        .FACTION_TECH, 2, .VOLATILE_SHARD, 1, .RARE_BIOLOGIC, 0, .FOOD, 0);
+
+    // -- Tier 4 --
+    add_recipe("nexus_elixir", "Nexus Elixir", 4, .HEAL, 200,
+        "Fully restores HP.",
+        .PURE_NEXUS_ESSENCE, 1, .UMBRALARI_FRAGMENT, 1, .RARE_BIOLOGIC, 2, .FOOD, 0);
+}
+
+add_recipe :: proc(id: string, name: string, tier: int, result_type: Recipe_Result_Type, result_value: int, description: string,
+                   res1: Resource_Type, amt1: int, res2: Resource_Type, amt2: int,
+                   res3: Resource_Type, amt3: int, res4: Resource_Type, amt4: int) {
+    recipe := new(Recipe);
+    recipe.id = id;
+    recipe.name = name;
+    recipe.tier = tier;
+    recipe.result_type = result_type;
+    recipe.result_value = result_value;
+    recipe.description = description;
+
+    if amt1 > 0 {
+        recipe.ingredients->append(Recipe_Ingredient{res1, amt1});
+    }
+    if amt2 > 0 {
+        recipe.ingredients->append(Recipe_Ingredient{res2, amt2});
+    }
+    if amt3 > 0 {
+        recipe.ingredients->append(Recipe_Ingredient{res3, amt3});
+    }
+    if amt4 > 0 {
+        recipe.ingredients->append(Recipe_Ingredient{res4, amt4});
+    }
+
+    all_recipes->append(recipe);
+}
+
+get_recipe_count :: proc() -> int {
+    return all_recipes.count;
+}
+
+get_recipe :: proc(index: int) -> Recipe {
+    if index < 0 return null;
+    if index >= all_recipes.count return null;
+    return all_recipes[index];
+}
+
+count_resource_in_inventory :: proc(player: Player, res_type: Resource_Type) -> int {
+    total := 0;
+    for i: 0..player.default_inventory.capacity-1 {
+        item := player.default_inventory->get_item(i);
+        if item == null continue;
+        defn := item->get_definition();
+        res_defn := defn.(Resource_Definition);
+        if res_defn != null {
+            if res_defn.resource_type == res_type {
+                total += item.count.(int);
+            }
+        }
+    }
+    return total;
+}
+
+can_craft_recipe :: proc(player: Player, recipe: Recipe) -> bool {
+    for ing: recipe.ingredients {
+        have := count_resource_in_inventory(player, ing.resource_type);
+        if have < ing.amount {
+            return false;
+        }
+    }
+    return true;
+}
+
+consume_ingredients :: proc(player: Player, recipe: Recipe) {
+    for ing: recipe.ingredients {
+        remaining := ing.amount;
+        for i: 0..player.default_inventory.capacity-1 {
+            if remaining <= 0 break;
+            item := player.default_inventory->get_item(i);
+            if item == null continue;
+            defn := item->get_definition();
+            res_defn := defn.(Resource_Definition);
+            if res_defn == null continue;
+            if res_defn.resource_type != ing.resource_type continue;
+
+            stack := item.count.(int);
+            if stack <= remaining {
+                remaining -= stack;
+                Items.destroy_item_instance(item);
+            } else {
+                Items.destroy_item_instance(item, remaining.(s64));
+                remaining = 0;
+            }
+        }
+    }
+}
+
+apply_recipe_result :: proc(player: Player, recipe: Recipe) {
+    switch recipe.result_type {
+        case .HEAL: {
+            player.hp += recipe.result_value;
+            if player.hp > player.hp_max {
+                player.hp = player.hp_max;
+            }
+        }
+        case .BUFF_MUSCLE: {
+            player.muscle += recipe.result_value;
+            if player.muscle > player.muscle_max {
+                player.muscle = player.muscle_max;
+            }
+        }
+        case .BUFF_SPARK: {
+            player.spark += recipe.result_value;
+            if player.spark > player.spark_max {
+                player.spark = player.spark_max;
+            }
+        }
+        case .BUFF_EDGE: {
+            player.edge += recipe.result_value;
+            if player.edge > player.edge_max {
+                player.edge = player.edge_max;
+            }
+        }
+        case .SHIELD: {
+            player.hp += recipe.result_value;
+            if player.hp > player.hp_max + recipe.result_value {
+                player.hp = player.hp_max + recipe.result_value;
+            }
+        }
+        case .REPAIR_KIT: {
+            player.hp += recipe.result_value;
+            if player.hp > player.hp_max {
+                player.hp = player.hp_max;
+            }
+        }
+    }
+    Notifier.notify(player, format_string("Crafted %!", {recipe.name}));
+}
+
+craft_recipe :: proc(player: Player, recipe: Recipe) -> bool {
+    if !can_craft_recipe(player, recipe) return false;
+    consume_ingredients(player, recipe);
+    apply_recipe_result(player, recipe);
+    return true;
 }

@@ -1,0 +1,158 @@
+CRAFT_ROWS_VISIBLE :: 5;
+CRAFT_ROW_HEIGHT :: 80;
+CRAFT_HEADER_HEIGHT :: 60;
+
+draw_crafting_panel :: proc(player: Player) {
+    UI.push_layer_relative(50);
+    defer UI.pop_layer();
+
+    safe := UI.get_safe_screen_rect();
+
+    // Full-screen dim
+    UI.quad(UI.get_screen_rect(), core_globals.white_sprite, {0, 0, 0, 0.65});
+
+    // Panel
+    panel := safe->center_rect()->grow(280, 260, 280, 260);
+    UI.quad(panel, core_globals.white_sprite, {0.1, 0.1, 0.15, 0.95});
+
+    // Header
+    header := panel->cut_top(CRAFT_HEADER_HEIGHT);
+    UI.quad(header, core_globals.white_sprite, {0.15, 0.15, 0.2, 1});
+
+    ts := UI.default_text_settings();
+    ts.size = 42;
+    ts.color = {1, 1, 1, 1};
+    ts.halign = .CENTER;
+    ts.valign = .CENTER;
+    ts.do_outline = true;
+    ts.outline_thickness = 2;
+    ts.outline_color = {0, 0, 0, 1};
+    UI.text(header, ts, "Crafting");
+
+    // Close button
+    bs := UI.default_button_settings();
+    bs.sprite = get_asset(Texture_Asset, "$AO/new/modal/buttons_2/button_3.png");
+    bs.press_scaling = 0.35;
+    close_ts := UI.default_text_settings();
+    close_ts.size = 36;
+    close_ts.color = {1, 1, 1, 1};
+
+    close_rect := header->right_rect()->grow(0, 0, 32, 0)->offset(0, 0)->cut_right(65)->cut_top(65);
+    close_rect = close_rect->offset(0, 0);
+    close_rect2 := header->top_right_rect()->grow(32, 0, 32, 65);
+    if UI.button(close_rect2, bs, close_ts, "X").clicked {
+        player.crafting_open = false;
+        return;
+    }
+
+    // Spacer
+    panel->cut_top(8);
+
+    // Recipe list
+    recipe_count := get_recipe_count();
+    for i: 0..recipe_count-1 {
+        UI.push_id("recipe_%", {i});
+        defer UI.pop_id();
+
+        recipe := get_recipe(i);
+        if recipe == null continue;
+
+        row := panel->cut_top(CRAFT_ROW_HEIGHT);
+        panel->cut_top(4);
+
+        draw_recipe_row(player, row, recipe, i);
+    }
+}
+
+draw_recipe_row :: proc(player: Player, row: Rect, recipe: Recipe, index: int) {
+    can_make := can_craft_recipe(player, recipe);
+
+    // Row background
+    bg_color := v4{0.15, 0.15, 0.2, 0.8};
+    if !can_make {
+        bg_color = {0.12, 0.12, 0.15, 0.6};
+    }
+    UI.quad(row, core_globals.white_sprite, bg_color);
+
+    // Tier pip
+    tier_rect := row->cut_left(8);
+    tier_color := get_tier_color(recipe.tier);
+    UI.quad(tier_rect, core_globals.white_sprite, tier_color);
+
+    // Inset content
+    content := row->inset(6);
+
+    // Craft button on the right
+    btn_area := content->cut_right(100);
+    bs := UI.default_button_settings();
+    ts_btn := UI.default_text_settings();
+    ts_btn.size = 28;
+    ts_btn.color = {1, 1, 1, 1};
+
+    if can_make {
+        bs.sprite = get_asset(Texture_Asset, "$AO/new/modal/buttons_2/button_2.png");
+    } else {
+        bs.sprite = get_asset(Texture_Asset, "$AO/new/modal/buttons_2/button_8.png");
+    }
+    bs.press_scaling = 0.35;
+
+    UI.push_disabled(!can_make);
+    defer UI.pop_disabled();
+
+    if UI.button(btn_area->inset(4), bs, ts_btn, "Craft").clicked {
+        if can_make {
+            craft_recipe(player, recipe);
+        }
+    }
+
+    // Name + description on the left
+    text_area := content;
+    name_rect := text_area->cut_top(30);
+
+    ts := UI.default_text_settings();
+    ts.size = 30;
+    ts.halign = .LEFT;
+    ts.valign = .CENTER;
+    ts.do_outline = true;
+    ts.outline_thickness = 1;
+    ts.outline_color = {0, 0, 0, 1};
+
+    name_color := v4{1, 1, 1, 1};
+    if !can_make {
+        name_color = {0.6, 0.6, 0.6, 1};
+    }
+    ts.color = name_color;
+    UI.text(name_rect, ts, recipe.name);
+
+    // Ingredient list
+    ing_rect := text_area;
+    ts.size = 22;
+    layout := UI.make_directional_layout(ing_rect, .RIGHT);
+
+    for j: 0..recipe.ingredients.count-1 {
+        ing := recipe.ingredients[j];
+        res_defn := get_resource_definition(ing.resource_type);
+        if res_defn == null continue;
+
+        have := count_resource_in_inventory(player, ing.resource_type);
+        if have >= ing.amount {
+            ts.color = {0.5, 1.0, 0.5, 1};
+        } else {
+            ts.color = {1.0, 0.4, 0.4, 1};
+        }
+
+        label := format_string("% %/%", {res_defn->get_name(), have, ing.amount});
+
+        text_width := label.count.(int) * 9 + 12;
+        chip_rect := layout->next(text_width);
+        UI.text(chip_rect, ts, label);
+    }
+}
+
+get_tier_color :: proc(tier: int) -> v4 {
+    if tier == 1 return {0.6, 0.6, 0.6, 1};
+    if tier == 2 return {0.3, 0.8, 0.3, 1};
+    if tier == 3 return {0.3, 0.5, 1.0, 1};
+    if tier == 4 return {0.8, 0.4, 1.0, 1};
+    return {1, 1, 1, 1};
+}

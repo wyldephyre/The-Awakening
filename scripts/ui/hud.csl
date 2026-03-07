@@ -26,6 +26,18 @@ draw_hud :: proc(player: Player) {
     ts.outline_thickness = 2;
     ts.outline_color = {0, 0, 0, 1};
     UI.text(zone_rect, ts, "Zone %", {zone});
+
+    // Craft button - right side under zone
+    craft_rect := safe->top_right_rect()->grow(0, 0, 37, 105)->offset(-20, -75);
+    craft_bs := UI.default_button_settings();
+    craft_bs.sprite = get_asset(Texture_Asset, "$AO/new/modal/buttons_2/button_1.png");
+    craft_bs.press_scaling = 0.35;
+    craft_ts := UI.default_text_settings();
+    craft_ts.size = 30;
+    craft_ts.color = {1, 1, 1, 1};
+    if UI.button(craft_rect, craft_bs, craft_ts, "Craft").clicked {
+        player.crafting_open = !player.crafting_open;
+    }
 }
 
 draw_health_bar :: proc(bar_rect: Rect, player: Player) {

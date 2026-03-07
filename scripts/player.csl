@@ -26,6 +26,9 @@ Player :: class : Player_Base {
     invulnerable: bool;
     invulnerable_timer: float;
 
+    // UI state
+    crafting_open: bool;
+
     // Internal
     regen_timer: float;
 
@@ -95,6 +98,10 @@ Player :: class : Player_Base {
                 hotbar_options.keyboard_item_selection = true;
 
                 result := Items.draw_hotbar(this, default_inventory, hotbar_options);
+
+                if crafting_open {
+                    draw_crafting_panel(this);
+                }
             }
         }
     }
