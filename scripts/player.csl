@@ -17,6 +17,7 @@ Player :: class : Player_Base {
     // Character data
     character_created: bool;
     character_sentence: Character_Sentence;
+    creation_step: int;
 
     // Combat
     hp: int;
@@ -43,6 +44,10 @@ Player :: class : Player_Base {
 
         // Load saved data
         load_player_data(this);
+
+        if !character_created {
+            this->add_freeze_reason("character_creation");
+        }
     }
 
     ao_update :: method(dt: float) {
@@ -73,20 +78,24 @@ Player :: class : Player_Base {
 
     ao_late_update :: method(dt: float) {
         if this->is_local_or_server() {
-            draw_hud(this);
+            if !character_created {
+                draw_character_creation(this);
+            } else {
+                draw_hud(this);
 
-            if !is_dead {
-                draw_ability_button(this, Melee_Attack, 0);
-                draw_ability_button(this, Dodge_Roll, 1);
+                if !is_dead {
+                    draw_ability_button(this, Melee_Attack, 0);
+                    draw_ability_button(this, Dodge_Roll, 1);
+                }
+
+                hotbar_options := Inventory_Draw_Options.default();
+                hotbar_options.hotbar_item_count = 5;
+                hotbar_options.enable_use_from_hotbar = true;
+                hotbar_options.scroll_item_selection = true;
+                hotbar_options.keyboard_item_selection = true;
+
+                result := Items.draw_hotbar(this, default_inventory, hotbar_options);
             }
-
-            hotbar_options := Inventory_Draw_Options.default();
-            hotbar_options.hotbar_item_count = 5;
-            hotbar_options.enable_use_from_hotbar = true;
-            hotbar_options.scroll_item_selection = true;
-            hotbar_options.keyboard_item_selection = true;
-
-            result := Items.draw_hotbar(this, default_inventory, hotbar_options);
         }
     }
 
@@ -130,6 +139,7 @@ load_player_data :: proc(player: Player) {
     player.hp_max = 100;
 
     if player.character_created {
+        apply_descriptor_bonuses(player);
         apply_type_bonuses(player);
     }
 

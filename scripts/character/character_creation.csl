@@ -1,0 +1,248 @@
+Creation_Option :: struct {
+    name: string;
+    description: string;
+}
+
+g_descriptor_options: [..]Creation_Option;
+g_type_options: [..]Creation_Option;
+g_focus_options: [..]Creation_Option;
+g_creation_opts_initialized: bool;
+
+init_creation_options :: proc() {
+    if g_creation_opts_initialized return;
+    g_creation_opts_initialized = true;
+
+    add_creation_option(ref g_descriptor_options, "Ruthless", "Edge +2");
+    add_creation_option(ref g_descriptor_options, "Curious", "Spark +2");
+    add_creation_option(ref g_descriptor_options, "Steadfast", "Muscle +2");
+    add_creation_option(ref g_descriptor_options, "Resourceful", "All stats +1");
+
+    add_creation_option(ref g_type_options, "Scrapper", "Muscle+2, Edge+1, HP+20");
+    add_creation_option(ref g_type_options, "Builder", "Muscle+1, Edge+2, HP+10");
+    add_creation_option(ref g_type_options, "Seeker", "Spark+1, Edge+2, HP+5");
+    add_creation_option(ref g_type_options, "Weaver", "Spark+3");
+
+    add_creation_option(ref g_focus_options, "fights relentlessly", "Combat mastery");
+    add_creation_option(ref g_focus_options, "builds for the future", "Construction expertise");
+    add_creation_option(ref g_focus_options, "explores the unknown", "Discovery and navigation");
+    add_creation_option(ref g_focus_options, "uncovers hidden truths", "Knowledge and insight");
+}
+
+add_creation_option :: proc(list: ref [..]Creation_Option, name: string, description: string) {
+    opt: Creation_Option;
+    opt.name = name;
+    opt.description = description;
+    list->append(opt);
+}
+
+draw_character_creation :: proc(player: Player) {
+    init_creation_options();
+
+    screen := UI.get_screen_rect();
+    safe := UI.get_safe_screen_rect();
+
+    UI.push_layer(50);
+    defer UI.pop_layer();
+
+    UI.quad(screen, core_globals.white_sprite, {0, 0, 0, 0.7});
+    UI.blocker(screen, "creation_blocker");
+
+    panel := safe->center_rect()->grow(270, 300, 270, 300);
+    UI.quad(panel, core_globals.white_sprite, {0.12, 0.12, 0.18, 0.95});
+
+    content := panel->inset(20);
+
+    step := player.creation_step;
+
+    if step == 0 {
+        draw_creation_step(player, ref content, "Choose Your Nature", "What defines you at your core?", g_descriptor_options, 0);
+    } else if step == 1 {
+        draw_creation_step(player, ref content, "Choose Your Path", "How do you survive in the wasteland?", g_type_options, 1);
+    } else if step == 2 {
+        draw_creation_step(player, ref content, "Choose Your Focus", "What drives you forward?", g_focus_options, 2);
+    } else {
+        draw_creation_confirm(player, ref content);
+    }
+}
+
+draw_creation_step :: proc(player: Player, content: ref Rect, title: string, subtitle: string, options: []Creation_Option, step: int) {
+    ts := UI.default_text_settings();
+
+    header := content->cut_top(55);
+    ts.size = 42;
+    ts.halign = .CENTER;
+    ts.valign = .CENTER;
+    UI.text(header, ts, title);
+
+    step_rect := content->cut_top(28);
+    ts.size = 24;
+    ts.color = {0.6, 0.6, 0.6, 1};
+    UI.text(step_rect, ts, "Step % of 3", {step + 1});
+    ts.color = {1, 1, 1, 1};
+
+    content->cut_top(5);
+
+    sub := content->cut_top(38);
+    ts.size = 28;
+    ts.color = {0.8, 0.8, 0.8, 1};
+    UI.text(sub, ts, subtitle);
+    ts.color = {1, 1, 1, 1};
+
+    content->cut_top(10);
+
+    bs := UI.default_button_settings();
+    bs.sprite = get_asset(Texture_Asset, "$AO/new/modal/buttons_2/button_2.png");
+    bs.press_scaling = 0.35;
+    ts.size = 30;
+
+    for i: 0..options.count-1 {
+        UI.push_id("creation_opt_%", {i});
+        defer UI.pop_id();
+
+        btn_rect := content->cut_top(65);
+        opt := options[i];
+
+        result := UI.button(btn_rect, bs, ts, "% - %", {opt.name, opt.description});
+
+        if result.clicked {
+            if step == 0 {
+                player.character_sentence.descriptor = opt.name;
+            } else if step == 1 {
+                player.character_sentence.character_type = opt.name;
+            } else if step == 2 {
+                player.character_sentence.focus = opt.name;
+            }
+            player.creation_step = step + 1;
+        }
+
+        content->cut_top(8);
+    }
+
+    if step > 0 {
+        back_rect := content->cut_bottom(60);
+        back_bs := UI.default_button_settings();
+        back_bs.sprite = get_asset(Texture_Asset, "$AO/new/modal/buttons_2/button_8.png");
+        back_bs.press_scaling = 0.35;
+
+        back_btn := back_rect->center_rect()->grow(30, 105, 30, 105);
+        if UI.button(back_btn, back_bs, ts, "Back").clicked {
+            player.creation_step = step - 1;
+        }
+    }
+}
+
+draw_creation_confirm :: proc(player: Player, content: ref Rect) {
+    ts := UI.default_text_settings();
+
+    header := content->cut_top(55);
+    ts.size = 42;
+    ts.halign = .CENTER;
+    ts.valign = .CENTER;
+    UI.text(header, ts, "Your Identity");
+
+    content->cut_top(15);
+
+    sentence_rect := content->cut_top(60);
+    ts.size = 32;
+    ts.color = {1, 0.9, 0.6, 1};
+    sentence := player.character_sentence;
+    UI.text(sentence_rect, ts, "I am a % % who %", {sentence.descriptor, sentence.character_type, sentence.focus});
+    ts.color = {1, 1, 1, 1};
+
+    content->cut_top(15);
+
+    draw_stats_preview(ref content, sentence.descriptor, sentence.character_type);
+
+    content->cut_top(15);
+
+    footer := content->cut_bottom(70);
+
+    bs := UI.default_button_settings();
+    bs.press_scaling = 0.35;
+    ts.size = 32;
+
+    back_rect := footer->cut_left_unscaled(footer->width() * 0.45);
+    footer->cut_left(10);
+    confirm_rect := footer;
+
+    bs.sprite = get_asset(Texture_Asset, "$AO/new/modal/buttons_2/button_8.png");
+    if UI.button(back_rect, bs, ts, "Back").clicked {
+        player.creation_step = 2;
+    }
+
+    bs.sprite = get_asset(Texture_Asset, "$AO/new/modal/buttons_2/button_5.png");
+    if UI.button(confirm_rect, bs, ts, "Confirm").clicked {
+        complete_character_creation(player);
+    }
+}
+
+draw_stats_preview :: proc(content: ref Rect, descriptor: string, char_type: string) {
+    muscle := 10;
+    spark := 10;
+    edge := 10;
+    hp := 100;
+
+    if descriptor == "Ruthless" { edge += 2; }
+    else if descriptor == "Curious" { spark += 2; }
+    else if descriptor == "Steadfast" { muscle += 2; }
+    else if descriptor == "Resourceful" { muscle += 1; spark += 1; edge += 1; }
+
+    if char_type == "Scrapper" { muscle += 2; edge += 1; hp += 20; }
+    else if char_type == "Builder" { muscle += 1; edge += 2; hp += 10; }
+    else if char_type == "Seeker" { spark += 1; edge += 2; hp += 5; }
+    else if char_type == "Weaver" { spark += 3; }
+
+    ts := UI.default_text_settings();
+    ts.size = 28;
+    ts.halign = .LEFT;
+    ts.valign = .CENTER;
+
+    line := content->cut_top(32);
+    UI.text(line, ts, "HP: %", {hp});
+
+    line = content->cut_top(32);
+    ts.color = {0.8, 0.2, 0.2, 1};
+    UI.text(line, ts, "Muscle: %", {muscle});
+
+    line = content->cut_top(32);
+    ts.color = {0.3, 0.5, 0.9, 1};
+    UI.text(line, ts, "Spark: %", {spark});
+
+    line = content->cut_top(32);
+    ts.color = {0.2, 0.8, 0.3, 1};
+    UI.text(line, ts, "Edge: %", {edge});
+
+    ts.color = {1, 1, 1, 1};
+}
+
+apply_descriptor_bonuses :: proc(player: Player) {
+    desc := player.character_sentence.descriptor;
+    if desc == "Ruthless" { player.edge_max += 2; }
+    else if desc == "Curious" { player.spark_max += 2; }
+    else if desc == "Steadfast" { player.muscle_max += 2; }
+    else if desc == "Resourceful" {
+        player.muscle_max += 1;
+        player.spark_max += 1;
+        player.edge_max += 1;
+    }
+}
+
+complete_character_creation :: proc(player: Player) {
+    player.character_created = true;
+    player->remove_freeze_reason("character_creation");
+
+    player.muscle_max = 10;
+    player.spark_max = 10;
+    player.edge_max = 10;
+    player.hp_max = 100;
+
+    apply_descriptor_bonuses(player);
+    apply_type_bonuses(player);
+
+    player.hp = player.hp_max;
+    player.muscle = player.muscle_max;
+    player.spark = player.spark_max;
+    player.edge = player.edge_max;
+
+    save_player_data(player);
+}
