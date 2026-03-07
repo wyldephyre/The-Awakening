@@ -8,7 +8,7 @@ GEAR_SLOT_COUNT :: 3;
 
 Gear_Definition :: class : Item_Definition {
     slot: Gear_Slot;
-    tier: int;
+    gear_tier: int;
     damage_bonus: int;
     hp_bonus: int;
     muscle_bonus: int;
@@ -79,7 +79,7 @@ register_gear_item :: proc(id: string, name: string, slot: Gear_Slot, tier: int,
     desc: Item_Definition_Desc = {id, name, null, 1, resource_tier_to_item_tier(tier)};
     defn := Items.register_item_definition(desc, Gear_Definition, Item_Instance);
     defn.slot = slot;
-    defn.tier = tier;
+    defn.gear_tier = tier;
     defn.damage_bonus = damage_bonus;
     defn.hp_bonus = hp_bonus;
     defn.muscle_bonus = muscle_bonus;
