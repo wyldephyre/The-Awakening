@@ -1,0 +1,39 @@
+RESPAWN_TIME :: 5.0;
+
+Player_Death_Effect :: class : Effect_Base {
+    effect_start :: method() {
+        player_specific.freeze_player = true;
+        player->add_invisibility_reason("death");
+        player->add_name_invisibility_reason("death");
+    }
+
+    effect_update :: method(dt: float) {
+        time_left := RESPAWN_TIME - get_elapsed_time();
+
+        if player->is_local() {
+            safe := UI.get_safe_screen_rect();
+            ts := UI.default_text_settings();
+            ts.size = 64;
+            ts.color = {1, 0.3, 0.3, 1};
+            rect := safe->center_rect()->grow(40, 200, 40, 200);
+            UI.text(rect, ts, "Respawning in %...", {time_left.(int) + 1});
+        }
+
+        if time_left <= 0 {
+            remove_effect(false);
+            return;
+        }
+    }
+
+    effect_end :: method(interrupt: bool) {
+        player->remove_invisibility_reason("death");
+        player->remove_name_invisibility_reason("death");
+
+        player.is_dead = false;
+        player.hp = player.hp_max;
+        player.invulnerable = true;
+        player.invulnerable_timer = 2.0;
+        entity->set_local_position({0, 0});
+        entity->mark_teleported();
+    }
+}

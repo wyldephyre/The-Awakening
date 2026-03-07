@@ -1,9 +1,15 @@
 draw_hud :: proc(player: Player) {
     safe := UI.get_safe_screen_rect();
 
-    // Pool bars in top-left
-    pool_area := safe->top_left_rect()->grow(0, 200, 160, 0)->offset(20, -20);
+    // Health + pool bars in top-left
+    pool_area := safe->top_left_rect()->grow(0, 220, 220, 0)->offset(20, -20);
 
+    // Health bar
+    hp_rect := pool_area->cut_top(50);
+    draw_health_bar(hp_rect, player);
+    pool_area->cut_top(8);
+
+    // Pool bars
     draw_pool_bar(ref pool_area, "Muscle", player.muscle, player.muscle_max, {0.8, 0.2, 0.2, 1.0});
     draw_pool_bar(ref pool_area, "Spark", player.spark, player.spark_max, {0.3, 0.5, 0.9, 1.0});
     draw_pool_bar(ref pool_area, "Edge", player.edge, player.edge_max, {0.2, 0.8, 0.3, 1.0});
@@ -20,6 +26,32 @@ draw_hud :: proc(player: Player) {
     ts.outline_thickness = 2;
     ts.outline_color = {0, 0, 0, 1};
     UI.text(zone_rect, ts, "Zone %", {zone});
+}
+
+draw_health_bar :: proc(bar_rect: Rect, player: Player) {
+    UI.quad(bar_rect, core_globals.white_sprite, {0, 0, 0, 0.5});
+
+    pct := 0.0;
+    if player.hp_max > 0 {
+        pct = player.hp.(float) / player.hp_max.(float);
+    }
+    pct = clamp(pct, 0.0, 1.0);
+
+    if pct > 0 {
+        filled := bar_rect->subrect(0, 0, pct, 1);
+        fill_color := lerp(v4{0.8, 0.1, 0.1, 1.0}, {0.1, 0.8, 0.1, 1.0}, pct);
+        UI.quad(filled, core_globals.white_sprite, fill_color);
+    }
+
+    ts := UI.default_text_settings();
+    ts.size = 30;
+    ts.color = {1, 1, 1, 1};
+    ts.halign = .CENTER;
+    ts.valign = .CENTER;
+    ts.do_outline = true;
+    ts.outline_thickness = 2;
+    ts.outline_color = {0, 0, 0, 1};
+    UI.text(bar_rect, ts, "HP %/%", {player.hp, player.hp_max});
 }
 
 draw_pool_bar :: proc(area: ref Rect, name: string, current: int, max_val: int, color: v4) {

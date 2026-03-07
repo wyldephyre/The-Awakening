@@ -18,6 +18,13 @@ Player :: class : Player_Base {
     character_created: bool;
     character_sentence: Character_Sentence;
 
+    // Combat
+    hp: int;
+    hp_max: int;
+    is_dead: bool;
+    invulnerable: bool;
+    invulnerable_timer: float;
+
     // Internal
     regen_timer: float;
 
@@ -53,12 +60,25 @@ Player :: class : Player_Base {
                     edge += 1;
                 }
             }
+
+            if invulnerable_timer > 0 {
+                invulnerable_timer -= dt;
+                if invulnerable_timer <= 0 {
+                    invulnerable = false;
+                    invulnerable_timer = 0;
+                }
+            }
         }
     }
 
     ao_late_update :: method(dt: float) {
         if this->is_local_or_server() {
             draw_hud(this);
+
+            if !is_dead {
+                draw_ability_button(this, Melee_Attack, 0);
+                draw_ability_button(this, Dodge_Roll, 1);
+            }
 
             hotbar_options := Inventory_Draw_Options.default();
             hotbar_options.hotbar_item_count = 5;
@@ -77,6 +97,7 @@ Player :: class : Player_Base {
     }
 
     ao_can_use_ability :: method(ability: Ability_Base) -> bool {
+        if is_dead return false;
         return true;
     }
 
@@ -106,10 +127,15 @@ load_player_data :: proc(player: Player) {
     player.muscle_max = 10;
     player.spark_max = 10;
     player.edge_max = 10;
+    player.hp_max = 100;
 
     if player.character_created {
         apply_type_bonuses(player);
     }
+
+    // Set HP to max on join
+    player.hp = player.hp_max;
+    player.is_dead = false;
 
     // Load current pool values, defaulting to max
     player.muscle = Save.get_int(player, "muscle", player.muscle_max);
@@ -126,14 +152,17 @@ apply_type_bonuses :: proc(player: Player) {
     if sentence.character_type == "Scrapper" {
         player.muscle_max += 2;
         player.edge_max += 1;
+        player.hp_max += 20;
     }
     else if sentence.character_type == "Builder" {
         player.muscle_max += 1;
         player.edge_max += 2;
+        player.hp_max += 10;
     }
     else if sentence.character_type == "Seeker" {
         player.spark_max += 1;
         player.edge_max += 2;
+        player.hp_max += 5;
     }
     else if sentence.character_type == "Weaver" {
         player.spark_max += 3;
@@ -154,4 +183,23 @@ save_player_data :: proc(player: Player) {
     Save.set_int(player, "muscle", player.muscle);
     Save.set_int(player, "spark", player.spark);
     Save.set_int(player, "edge", player.edge);
+}
+
+player_take_damage :: proc(player: Player, amount: int) {
+    if player.is_dead return;
+    if player.invulnerable return;
+
+    player.hp -= amount;
+    spawn_damage_number(player.entity.world_position + v2{0, 1.0}, amount, {1, 0.3, 0.3, 1});
+
+    if player.hp <= 0 {
+        player.hp = 0;
+        player_die(player);
+    }
+}
+
+player_die :: proc(player: Player) {
+    player.is_dead = true;
+    effect := new(Player_Death_Effect);
+    player.entity->set_active_effect(effect);
 }

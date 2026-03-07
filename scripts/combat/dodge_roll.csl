@@ -1,0 +1,48 @@
+ROLL_DURATION :: 0.4;
+ROLL_SPEED :: 12.0;
+ROLL_COOLDOWN :: 1.5;
+
+Dodge_Roll :: class : Ability_Base {
+    on_init :: method() {
+        name = "Dodge";
+        is_aimed_ability = true;
+    }
+
+    can_use :: method() -> bool {
+        return !player.is_dead;
+    }
+
+    on_update :: method(params: ref Ability_Update_Params) {
+        activation := Ability_Utilities.full_update_targeted_aimed_ability(player, this, ref params);
+
+        if activation.activate {
+            current_cooldown = ROLL_COOLDOWN;
+            effect := new(Roll_Effect);
+            effect.direction = activation.direction;
+            player.entity->set_active_effect(effect);
+        }
+    }
+}
+
+Roll_Effect :: class : Effect_Base {
+    direction: v2;
+    original_friction: float;
+
+    effect_start :: method() {
+        player_specific.disable_movement_inputs = true;
+        original_friction = player.agent.friction;
+        player.agent.friction = 0;
+        player->set_facing_right(direction.x > 0);
+        player.invulnerable = true;
+        set_duration(ROLL_DURATION);
+    }
+
+    effect_update :: method(dt: float) {
+        player.agent.velocity = direction * ROLL_SPEED;
+    }
+
+    effect_end :: method(interrupt: bool) {
+        player.agent.friction = original_friction;
+        player.invulnerable = false;
+    }
+}

@@ -1,0 +1,220 @@
+ENEMY_AGGRO_RANGE :: 8.0;
+ENEMY_DEAGGRO_RANGE :: 12.0;
+ENEMY_ATTACK_RANGE :: 1.2;
+ENEMY_ATTACK_COOLDOWN :: 1.5;
+ENEMY_PATROL_RADIUS :: 4.0;
+ENEMY_IDLE_TIME :: 2.0;
+
+Enemy_State :: enum {
+    IDLE;
+    PATROL;
+    CHASE;
+}
+
+Enemy :: class : Component {
+    hp: int;
+    hp_max: int;
+    damage: int;
+    speed: float;
+    zone: int;
+
+    state: Enemy_State;
+    attack_timer: float;
+    idle_timer: float;
+    patrol_target: v2;
+    spawn_origin: v2;
+    rng: u64;
+
+    sprite: Sprite_Renderer;
+
+    ao_start :: method() {
+        rng = rng_seed(entity.id);
+        spawn_origin = entity.local_position;
+        state = .IDLE;
+        idle_timer = rng_range_float(ref rng, 0, ENEMY_IDLE_TIME);
+        sprite = entity->get_component(Sprite_Renderer);
+    }
+
+    ao_update :: method(dt: float) {
+        if hp <= 0 return;
+
+        if Game.is_server() {
+            if attack_timer > 0 {
+                attack_timer -= dt;
+            }
+
+            closest_player, found := find_nearest_player(entity.world_position);
+
+            switch state {
+                case .IDLE: {
+                    idle_timer -= dt;
+                    if idle_timer <= 0 {
+                        patrol_target = spawn_origin + rng_disk(ref rng) * ENEMY_PATROL_RADIUS;
+                        state = .PATROL;
+                    }
+                    if found {
+                        dist := length(closest_player.entity.world_position - entity.world_position);
+                        if dist < ENEMY_AGGRO_RANGE {
+                            state = .CHASE;
+                        }
+                    }
+                }
+                case .PATROL: {
+                    dir := patrol_target - entity.world_position;
+                    dist := length(dir);
+                    if dist < 0.5 {
+                        state = .IDLE;
+                        idle_timer = rng_range_float(ref rng, 1, ENEMY_IDLE_TIME);
+                    } else {
+                        move_dir := normalize(dir);
+                        entity->add_local_position(move_dir * speed * 0.5 * dt);
+                        update_enemy_facing(move_dir);
+                    }
+
+                    if found {
+                        dist_to_player := length(closest_player.entity.world_position - entity.world_position);
+                        if dist_to_player < ENEMY_AGGRO_RANGE {
+                            state = .CHASE;
+                        }
+                    }
+                }
+                case .CHASE: {
+                    if !found {
+                        state = .IDLE;
+                        idle_timer = 1.0;
+                    } else {
+                        dir := closest_player.entity.world_position - entity.world_position;
+                        dist := length(dir);
+
+                        if dist > ENEMY_DEAGGRO_RANGE {
+                            state = .PATROL;
+                            patrol_target = spawn_origin;
+                        } else if dist <= ENEMY_ATTACK_RANGE {
+                            if attack_timer <= 0 {
+                                player_take_damage(closest_player, damage);
+                                attack_timer = ENEMY_ATTACK_COOLDOWN;
+                            }
+                        } else {
+                            move_dir := normalize(dir);
+                            entity->add_local_position(move_dir * speed * dt);
+                            update_enemy_facing(move_dir);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    ao_late_update :: method(dt: float) {
+        if hp <= 0 return;
+        if hp >= hp_max return;
+
+        UI.push_world_draw_context();
+        defer UI.pop_draw_context();
+
+        pos := entity.world_position;
+        UI.push_z(pos.y);
+        defer UI.pop_z();
+
+        bar_pos := pos + v2{0, 0.8};
+        bar_rect := Rect{bar_pos, bar_pos}->grow(0.04, 0.4, 0.04, 0.4);
+
+        UI.quad(bar_rect, core_globals.white_sprite, {0, 0, 0, 0.6});
+
+        pct := hp.(float) / hp_max.(float);
+        if pct > 0 {
+            fill_rect := bar_rect->subrect(0, 0, pct, 1);
+            fill_color := lerp(v4{0.8, 0.2, 0.2, 0.9}, {0.2, 0.8, 0.2, 0.9}, pct);
+            UI.quad(fill_rect, core_globals.white_sprite, fill_color);
+        }
+    }
+
+    update_enemy_facing :: method(dir: v2) {
+        if sprite != null {
+            sprite.flip_x = dir.x < 0;
+        }
+    }
+}
+
+find_nearest_player :: proc(position: v2) -> Player, bool {
+    closest: Player;
+    closest_dist := 9999.0;
+    found := false;
+
+    foreach p: component_iterator(Player) {
+        if p.is_dead continue;
+        dist := length(p.entity.world_position - position);
+        if dist < closest_dist {
+            closest_dist = dist;
+            closest = p;
+            found = true;
+        }
+    }
+
+    return closest, found;
+}
+
+get_enemy_color :: proc(zone: int) -> v4 {
+    if zone == 1 { return {0.8, 0.3, 0.3, 1.0}; }
+    if zone == 2 { return {0.7, 0.3, 0.7, 1.0}; }
+    if zone == 3 { return {0.3, 0.3, 0.8, 1.0}; }
+    return {0.4, 0.1, 0.1, 1.0};
+}
+
+damage_enemy :: proc(enemy: Enemy, amount: int, attacker: Player) {
+    if enemy.hp <= 0 return;
+
+    enemy.hp -= amount;
+    spawn_damage_number(enemy.entity.world_position + v2{0, 0.5}, amount, {1, 1, 0.3, 1});
+
+    if enemy.hp <= 0 {
+        enemy.hp = 0;
+        on_enemy_killed(enemy, attacker);
+    }
+}
+
+on_enemy_killed :: proc(enemy: Enemy, killer: Player) {
+    if Game.is_server() {
+        drop_rng: u64 = rng_seed(enemy.entity.id + get_frame_number());
+        drop_zone_resource(enemy.entity.world_position, enemy.zone, ref drop_rng, killer);
+    }
+
+    enemy.entity->queue_for_destruction(0.1);
+}
+
+drop_zone_resource :: proc(position: v2, zone: int, rng: ref u64, killer: Player) {
+    res_type: Resource_Type;
+
+    if zone == 1 {
+        roll := rng_range_int(ref rng, 0, 3);
+        if roll == 0 { res_type = .SALVAGE; }
+        else if roll == 1 { res_type = .FOOD; }
+        else if roll == 2 { res_type = .WATER; }
+        else { res_type = .SCRAP_METAL; }
+    }
+    else if zone == 2 {
+        roll := rng_range_int(ref rng, 0, 2);
+        if roll == 0 { res_type = .FUEL_CELL; }
+        else if roll == 1 { res_type = .NEXUS_CRYSTAL; }
+        else { res_type = .ALLOY_COMPONENT; }
+    }
+    else if zone == 3 {
+        roll := rng_range_int(ref rng, 0, 2);
+        if roll == 0 { res_type = .VOLATILE_SHARD; }
+        else if roll == 1 { res_type = .FACTION_TECH; }
+        else { res_type = .RARE_BIOLOGIC; }
+    }
+    else {
+        roll := rng_range_int(ref rng, 0, 1);
+        if roll == 0 { res_type = .UMBRALARI_FRAGMENT; }
+        else { res_type = .PURE_NEXUS_ESSENCE; }
+    }
+
+    defn := get_resource_definition(res_type);
+    if defn != null {
+        item := Items.create_item_instance(defn, 1);
+        dropped := Dropped_Item.spawn(position, item);
+        dropped->set_exclusive(killer);
+        dropped->do_spawn_animation(ref rng);
+    }
+}

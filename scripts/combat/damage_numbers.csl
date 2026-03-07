@@ -1,0 +1,67 @@
+DAMAGE_NUMBER_LIFETIME :: 0.8;
+DAMAGE_NUMBER_RISE_SPEED :: 2.0;
+
+Damage_Number :: struct {
+    position: v2;
+    value: int;
+    timer: float;
+    color: v4;
+}
+
+g_damage_numbers: [..]Damage_Number;
+
+spawn_damage_number :: proc(position: v2, value: int, color: v4) {
+    dn: Damage_Number;
+    dn.position = position;
+    dn.value = value;
+    dn.timer = 0;
+    dn.color = color;
+    g_damage_numbers->append(dn);
+}
+
+update_damage_numbers :: proc(dt: float) {
+    if Game.is_server() return;
+
+    i := 0;
+    while i < g_damage_numbers.count {
+        g_damage_numbers[i].timer += dt;
+        g_damage_numbers[i].position.y += DAMAGE_NUMBER_RISE_SPEED * dt;
+
+        if g_damage_numbers[i].timer >= DAMAGE_NUMBER_LIFETIME {
+            g_damage_numbers->unordered_remove_by_index(i);
+        } else {
+            i += 1;
+        }
+    }
+}
+
+draw_damage_numbers :: proc() {
+    if Game.is_server() return;
+    if g_damage_numbers.count == 0 return;
+
+    UI.push_world_draw_context();
+    defer UI.pop_draw_context();
+
+    ts := UI.default_text_settings();
+    ts.size = 0.35;
+    ts.do_outline = true;
+    ts.outline_thickness = 0.03;
+    ts.outline_color = {0, 0, 0, 1};
+
+    for i: 0..g_damage_numbers.count-1 {
+        dn := g_damage_numbers[i];
+        t := dn.timer / DAMAGE_NUMBER_LIFETIME;
+        alpha := 1.0 - t;
+
+        color := dn.color;
+        color.w = alpha;
+        ts.color = color;
+
+        pos := dn.position;
+        rect := Rect{pos, pos}->grow(0.05, 0.5, 0.05, 0.5);
+
+        UI.push_z(pos.y);
+        UI.text(rect, ts, "%", {dn.value});
+        UI.pop_z();
+    }
+}

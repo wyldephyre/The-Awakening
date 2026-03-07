@@ -2,6 +2,8 @@ import "core:ao"
 import "character"
 import "outpost"
 import "crafting"
+import "combat"
+import "enemies"
 import "ui"
 
 ao_before_scene_load :: proc() {
@@ -12,7 +14,10 @@ ao_start :: proc() {
 }
 
 ao_update :: proc(dt: float) {
+    update_enemy_spawner(dt);
+    update_damage_numbers(dt);
 }
 
 ao_late_update :: proc(dt: float) {
+    draw_damage_numbers();
 }
