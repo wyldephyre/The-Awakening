@@ -38,6 +38,7 @@ draw_hud :: proc(player: Player) {
     if UI.button(craft_rect, craft_bs, craft_ts, "Craft").clicked {
         player.crafting_open = !player.crafting_open;
         player.build_mode = false;
+        player.gear_open = false;
     }
 
     // Build button - right side under craft
@@ -57,6 +58,26 @@ draw_hud :: proc(player: Player) {
         player.build_mode = !player.build_mode;
         player.build_selected = -1;
         player.crafting_open = false;
+        player.gear_open = false;
+    }
+
+    // Gear button - right side under build
+    gear_rect := safe->top_right_rect()->grow(0, 0, 37, 105)->offset(-20, -185);
+    gear_bs := UI.default_button_settings();
+    gear_bs.press_scaling = 0.35;
+    gear_ts := UI.default_text_settings();
+    gear_ts.size = 30;
+    gear_ts.color = {1, 1, 1, 1};
+
+    if player.gear_open {
+        gear_bs.sprite = get_asset(Texture_Asset, "$AO/new/modal/buttons_2/button_7.png");
+    } else {
+        gear_bs.sprite = get_asset(Texture_Asset, "$AO/new/modal/buttons_2/button_9.png");
+    }
+    if UI.button(gear_rect, gear_bs, gear_ts, "Gear").clicked {
+        player.gear_open = !player.gear_open;
+        player.crafting_open = false;
+        player.build_mode = false;
     }
 }
 

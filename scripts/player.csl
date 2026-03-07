@@ -30,9 +30,18 @@ Player :: class : Player_Base {
     crafting_open: bool;
     build_mode: bool;
     build_selected: int;
+    gear_open: bool;
 
     // Outpost
     outpost: Player_Outpost;
+
+    // Equipment
+    equipment: Equipment_Data;
+    gear_damage_bonus: int;
+    gear_hp_bonus: int;
+    gear_muscle_bonus: int;
+    gear_spark_bonus: int;
+    gear_edge_bonus: int;
 
     // Internal
     regen_timer: float;
@@ -61,6 +70,7 @@ Player :: class : Player_Base {
 
         if character_created {
             init_player_outpost(this);
+            init_player_equipment(this);
         }
     }
 
@@ -118,6 +128,10 @@ Player :: class : Player_Base {
                     draw_build_mode(this);
                 }
 
+                if gear_open {
+                    draw_equipment_panel(this);
+                }
+
                 draw_outpost_world(this);
             }
         }
@@ -127,6 +141,7 @@ Player :: class : Player_Base {
         if Game.is_server() {
             save_player_data(this);
             save_outpost(this);
+            save_equipment(this);
         }
     }
 

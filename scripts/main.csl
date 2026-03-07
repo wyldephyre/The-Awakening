@@ -6,11 +6,13 @@ import "crafting"
 import "combat"
 import "enemies"
 import "gathering"
+import "equipment"
 import "ui"
 
 ao_before_scene_load :: proc() {
     register_resources();
     register_structure_defs();
+    register_gear();
 }
 
 ao_start :: proc() {

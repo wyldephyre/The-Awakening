@@ -1,0 +1,292 @@
+Gear_Slot :: enum {
+    WEAPON;
+    ARMOR;
+    ACCESSORY;
+}
+
+GEAR_SLOT_COUNT :: 3;
+
+Gear_Definition :: class : Item_Definition {
+    slot: Gear_Slot;
+    tier: int;
+    damage_bonus: int;
+    hp_bonus: int;
+    muscle_bonus: int;
+    spark_bonus: int;
+    edge_bonus: int;
+    description: string;
+}
+
+all_gear_definitions: [..]Gear_Definition;
+
+register_gear :: proc() {
+    // -- Weapons --
+    register_gear_item("scrap_blade", "Scrap Blade", .WEAPON, 1,
+        "A crude blade. +3 damage.",
+        3, 0, 0, 0, 0);
+
+    register_gear_item("alloy_sword", "Alloy Sword", .WEAPON, 2,
+        "A refined blade. +8 damage.",
+        8, 0, 0, 0, 0);
+
+    register_gear_item("faction_edge", "Faction Edge", .WEAPON, 3,
+        "Tech-infused weapon. +15 damage.",
+        15, 0, 0, 0, 0);
+
+    register_gear_item("nexus_saber", "Nexus Saber", .WEAPON, 4,
+        "Pure energy blade. +25 damage.",
+        25, 0, 0, 0, 0);
+
+    // -- Armor --
+    register_gear_item("scrap_vest", "Scrap Vest", .ARMOR, 1,
+        "Scrappy protection. +20 HP.",
+        0, 20, 0, 0, 0);
+
+    register_gear_item("alloy_plate", "Alloy Plate", .ARMOR, 2,
+        "Sturdy plating. +40 HP.",
+        0, 40, 0, 0, 0);
+
+    register_gear_item("faction_shell", "Faction Shell", .ARMOR, 3,
+        "Tech-reinforced armor. +70 HP.",
+        0, 70, 0, 0, 0);
+
+    register_gear_item("nexus_ward", "Nexus Ward", .ARMOR, 4,
+        "Energy barrier armor. +110 HP.",
+        0, 110, 0, 0, 0);
+
+    // -- Accessories --
+    register_gear_item("rough_charm", "Rough Charm", .ACCESSORY, 1,
+        "A simple trinket. +1 to all pools.",
+        0, 0, 1, 1, 1);
+
+    register_gear_item("crystal_band", "Crystal Band", .ACCESSORY, 2,
+        "Nexus-infused band. +2 to all pools.",
+        0, 0, 2, 2, 2);
+
+    register_gear_item("tech_implant", "Tech Implant", .ACCESSORY, 3,
+        "Faction augmentation. +3 to all pools, +10 HP.",
+        0, 10, 3, 3, 3);
+
+    register_gear_item("nexus_heart", "Nexus Heart", .ACCESSORY, 4,
+        "Pure nexus core. +5 to all pools, +20 HP.",
+        0, 20, 5, 5, 5);
+}
+
+register_gear_item :: proc(id: string, name: string, slot: Gear_Slot, tier: int,
+                            description: string,
+                            damage_bonus: int, hp_bonus: int,
+                            muscle_bonus: int, spark_bonus: int, edge_bonus: int) {
+    desc: Item_Definition_Desc = {id, name, null, 1, resource_tier_to_item_tier(tier)};
+    defn := Items.register_item_definition(desc, Gear_Definition, Item_Instance);
+    defn.slot = slot;
+    defn.tier = tier;
+    defn.damage_bonus = damage_bonus;
+    defn.hp_bonus = hp_bonus;
+    defn.muscle_bonus = muscle_bonus;
+    defn.spark_bonus = spark_bonus;
+    defn.edge_bonus = edge_bonus;
+    defn.description = description;
+    all_gear_definitions->append(defn);
+}
+
+get_gear_definition_by_id :: proc(id: string) -> Gear_Definition {
+    for defn: all_gear_definitions {
+        if defn->get_id() == id return defn;
+    }
+    return null;
+}
+
+// ---------------------------------------------------------------------------
+// Player equipment state (persisted via save)
+// ---------------------------------------------------------------------------
+
+Equipment_Data :: class {
+    weapon_id: string @ao_serialize;
+    armor_id: string @ao_serialize;
+    accessory_id: string @ao_serialize;
+}
+
+init_player_equipment :: proc(player: Player) {
+    if player.equipment == null {
+        player.equipment = new(Equipment_Data);
+    }
+    Save.try_get_json(player, "equipment_data", ref player.equipment);
+    if player.equipment == null {
+        player.equipment = new(Equipment_Data);
+    }
+    recalculate_gear_bonuses(player);
+}
+
+save_equipment :: proc(player: Player) {
+    if player.equipment == null return;
+    Save.set_json(player, "equipment_data", ref player.equipment);
+}
+
+// ---------------------------------------------------------------------------
+// Equip / unequip
+// ---------------------------------------------------------------------------
+
+equip_from_inventory :: proc(player: Player, slot_index: int) -> bool {
+    item := player.default_inventory->get_item(slot_index.(s64));
+    if item == null return false;
+
+    defn := item->get_definition();
+    gear_defn := defn.(Gear_Definition);
+    if gear_defn == null return false;
+
+    // Unequip current gear in that slot first (put back in inventory)
+    unequip_slot(player, gear_defn.slot);
+
+    // Set equipped id
+    switch gear_defn.slot {
+        case .WEAPON:    { player.equipment.weapon_id = gear_defn->get_id(); }
+        case .ARMOR:     { player.equipment.armor_id = gear_defn->get_id(); }
+        case .ACCESSORY: { player.equipment.accessory_id = gear_defn->get_id(); }
+    }
+
+    // Remove from inventory
+    Items.destroy_item_instance(item);
+
+    recalculate_gear_bonuses(player);
+    save_equipment(player);
+    Notifier.notify(player, format_string("Equipped %!", {gear_defn->get_name()}));
+    return true;
+}
+
+unequip_slot :: proc(player: Player, slot: Gear_Slot) -> bool {
+    if player.equipment == null return false;
+
+    equipped_id := "";
+    switch slot {
+        case .WEAPON:    { equipped_id = player.equipment.weapon_id; }
+        case .ARMOR:     { equipped_id = player.equipment.armor_id; }
+        case .ACCESSORY: { equipped_id = player.equipment.accessory_id; }
+    }
+
+    if equipped_id == "" return false;
+
+    // Create item and try to put in inventory
+    defn := get_gear_definition_by_id(equipped_id);
+    if defn == null {
+        clear_equipment_slot(player, slot);
+        return false;
+    }
+
+    new_item := Items.create_item_instance(defn, 1);
+    will_destroy: bool;
+    if Items.can_move_item_to_inventory(new_item, player.default_inventory, ref will_destroy) {
+        Items.move_item_to_inventory(new_item, player.default_inventory);
+        clear_equipment_slot(player, slot);
+        recalculate_gear_bonuses(player);
+        save_equipment(player);
+        Notifier.notify(player, format_string("Unequipped %.", {defn->get_name()}));
+        return true;
+    } else {
+        Items.destroy_item_instance(new_item);
+        Notifier.notify(player, "Inventory full!");
+        return false;
+    }
+}
+
+clear_equipment_slot :: proc(player: Player, slot: Gear_Slot) {
+    switch slot {
+        case .WEAPON:    { player.equipment.weapon_id = ""; }
+        case .ARMOR:     { player.equipment.armor_id = ""; }
+        case .ACCESSORY: { player.equipment.accessory_id = ""; }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Stat bonuses from gear
+// ---------------------------------------------------------------------------
+
+recalculate_gear_bonuses :: proc(player: Player) {
+    player.gear_damage_bonus = 0;
+    player.gear_hp_bonus = 0;
+    player.gear_muscle_bonus = 0;
+    player.gear_spark_bonus = 0;
+    player.gear_edge_bonus = 0;
+
+    if player.equipment == null return;
+
+    add_gear_bonus(player, player.equipment.weapon_id);
+    add_gear_bonus(player, player.equipment.armor_id);
+    add_gear_bonus(player, player.equipment.accessory_id);
+
+    // Reapply HP max with gear bonus
+    recalculate_player_stats(player);
+}
+
+add_gear_bonus :: proc(player: Player, gear_id: string) {
+    if gear_id == "" return;
+    defn := get_gear_definition_by_id(gear_id);
+    if defn == null return;
+
+    player.gear_damage_bonus += defn.damage_bonus;
+    player.gear_hp_bonus += defn.hp_bonus;
+    player.gear_muscle_bonus += defn.muscle_bonus;
+    player.gear_spark_bonus += defn.spark_bonus;
+    player.gear_edge_bonus += defn.edge_bonus;
+}
+
+recalculate_player_stats :: proc(player: Player) {
+    // Recalculate max values from base + type + descriptor + gear
+    player.muscle_max = 10;
+    player.spark_max = 10;
+    player.edge_max = 10;
+    player.hp_max = 100;
+
+    if player.character_created {
+        apply_descriptor_bonuses(player);
+        apply_type_bonuses(player);
+    }
+
+    player.hp_max += player.gear_hp_bonus;
+    player.muscle_max += player.gear_muscle_bonus;
+    player.spark_max += player.gear_spark_bonus;
+    player.edge_max += player.gear_edge_bonus;
+
+    // Clamp current values
+    if player.hp > player.hp_max {
+        player.hp = player.hp_max;
+    }
+    if player.muscle > player.muscle_max {
+        player.muscle = player.muscle_max;
+    }
+    if player.spark > player.spark_max {
+        player.spark = player.spark_max;
+    }
+    if player.edge > player.edge_max {
+        player.edge = player.edge_max;
+    }
+}
+
+get_equipped_name :: proc(player: Player, slot: Gear_Slot) -> string {
+    if player.equipment == null return "Empty";
+    equipped_id := "";
+    switch slot {
+        case .WEAPON:    { equipped_id = player.equipment.weapon_id; }
+        case .ARMOR:     { equipped_id = player.equipment.armor_id; }
+        case .ACCESSORY: { equipped_id = player.equipment.accessory_id; }
+    }
+    if equipped_id == "" return "Empty";
+    defn := get_gear_definition_by_id(equipped_id);
+    if defn == null return "Empty";
+    return defn->get_name();
+}
+
+get_equipped_def :: proc(player: Player, slot: Gear_Slot) -> Gear_Definition {
+    if player.equipment == null return null;
+    equipped_id := "";
+    switch slot {
+        case .WEAPON:    { equipped_id = player.equipment.weapon_id; }
+        case .ARMOR:     { equipped_id = player.equipment.armor_id; }
+        case .ACCESSORY: { equipped_id = player.equipment.accessory_id; }
+    }
+    if equipped_id == "" return null;
+    return get_gear_definition_by_id(equipped_id);
+}
+
+get_player_weapon_damage :: proc(player: Player) -> int {
+    return SLASH_DAMAGE + player.gear_damage_bonus;
+}

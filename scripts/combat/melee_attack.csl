@@ -46,10 +46,11 @@ Slash_Effect :: class : Effect_Base {
         nearby_enemies: [..]Enemy;
         Scene.get_all_components_in_range(entity.world_position, SLASH_RANGE, ref nearby_enemies);
 
+        total_damage := get_player_weapon_damage(player);
         for enemy: nearby_enemies {
             if hit_enemies->contains(enemy) continue;
             hit_enemies->append(enemy);
-            damage_enemy(enemy, SLASH_DAMAGE, player);
+            damage_enemy(enemy, total_damage, player);
         }
     }
 

@@ -92,6 +92,7 @@ Recipe :: class {
     ingredients: [..]Recipe_Ingredient;
     result_type: Recipe_Result_Type;
     result_value: int;
+    result_gear_id: string;
     description: string;
 }
 
@@ -102,6 +103,7 @@ Recipe_Result_Type :: enum {
     BUFF_EDGE;
     SHIELD;
     REPAIR_KIT;
+    GEAR;
 }
 
 all_recipes: [..]Recipe;
@@ -150,6 +152,55 @@ register_recipes :: proc() {
     add_recipe("nexus_elixir", "Nexus Elixir", 4, .HEAL, 200,
         "Fully restores HP.",
         .PURE_NEXUS_ESSENCE, 1, .UMBRALARI_FRAGMENT, 1, .RARE_BIOLOGIC, 2, .FOOD, 0);
+
+    // -- Gear Recipes --
+    add_gear_recipe("craft_scrap_blade", "Scrap Blade", 1, "scrap_blade",
+        "Craft a Scrap Blade (+3 DMG).",
+        .SCRAP_METAL, 5, .SALVAGE, 3, .FOOD, 0, .WATER, 0);
+
+    add_gear_recipe("craft_scrap_vest", "Scrap Vest", 1, "scrap_vest",
+        "Craft a Scrap Vest (+20 HP).",
+        .SALVAGE, 5, .SCRAP_METAL, 3, .FOOD, 0, .WATER, 0);
+
+    add_gear_recipe("craft_rough_charm", "Rough Charm", 1, "rough_charm",
+        "Craft a Rough Charm (+1 all pools).",
+        .FOOD, 3, .WATER, 3, .SALVAGE, 2, .SCRAP_METAL, 0);
+
+    add_gear_recipe("craft_alloy_sword", "Alloy Sword", 2, "alloy_sword",
+        "Craft an Alloy Sword (+8 DMG).",
+        .ALLOY_COMPONENT, 4, .FUEL_CELL, 2, .SCRAP_METAL, 3, .NEXUS_CRYSTAL, 0);
+
+    add_gear_recipe("craft_alloy_plate", "Alloy Plate", 2, "alloy_plate",
+        "Craft Alloy Plate (+40 HP).",
+        .ALLOY_COMPONENT, 5, .NEXUS_CRYSTAL, 2, .FUEL_CELL, 0, .SCRAP_METAL, 0);
+
+    add_gear_recipe("craft_crystal_band", "Crystal Band", 2, "crystal_band",
+        "Craft a Crystal Band (+2 all pools).",
+        .NEXUS_CRYSTAL, 3, .FUEL_CELL, 2, .ALLOY_COMPONENT, 2, .FOOD, 0);
+
+    add_gear_recipe("craft_faction_edge", "Faction Edge", 3, "faction_edge",
+        "Craft a Faction Edge (+15 DMG).",
+        .FACTION_TECH, 3, .VOLATILE_SHARD, 2, .ALLOY_COMPONENT, 3, .RARE_BIOLOGIC, 0);
+
+    add_gear_recipe("craft_faction_shell", "Faction Shell", 3, "faction_shell",
+        "Craft a Faction Shell (+70 HP).",
+        .RARE_BIOLOGIC, 3, .FACTION_TECH, 2, .VOLATILE_SHARD, 2, .ALLOY_COMPONENT, 0);
+
+    add_gear_recipe("craft_tech_implant", "Tech Implant", 3, "tech_implant",
+        "Craft a Tech Implant (+3 all, +10 HP).",
+        .VOLATILE_SHARD, 2, .FACTION_TECH, 2, .RARE_BIOLOGIC, 2, .NEXUS_CRYSTAL, 0);
+
+    add_gear_recipe("craft_nexus_saber", "Nexus Saber", 4, "nexus_saber",
+        "Craft a Nexus Saber (+25 DMG).",
+        .PURE_NEXUS_ESSENCE, 2, .UMBRALARI_FRAGMENT, 1, .FACTION_TECH, 3, .VOLATILE_SHARD, 0);
+
+    add_gear_recipe("craft_nexus_ward", "Nexus Ward", 4, "nexus_ward",
+        "Craft a Nexus Ward (+110 HP).",
+        .UMBRALARI_FRAGMENT, 2, .PURE_NEXUS_ESSENCE, 1, .RARE_BIOLOGIC, 3, .FACTION_TECH, 0);
+
+    add_gear_recipe("craft_nexus_heart", "Nexus Heart", 4, "nexus_heart",
+        "Craft a Nexus Heart (+5 all, +20 HP).",
+        .PURE_NEXUS_ESSENCE, 1, .UMBRALARI_FRAGMENT, 1, .VOLATILE_SHARD, 2, .RARE_BIOLOGIC, 2);
 }
 
 add_recipe :: proc(id: string, name: string, tier: int, result_type: Recipe_Result_Type, result_value: int, description: string,
@@ -161,6 +212,34 @@ add_recipe :: proc(id: string, name: string, tier: int, result_type: Recipe_Resu
     recipe.tier = tier;
     recipe.result_type = result_type;
     recipe.result_value = result_value;
+    recipe.description = description;
+
+    if amt1 > 0 {
+        recipe.ingredients->append(Recipe_Ingredient{res1, amt1});
+    }
+    if amt2 > 0 {
+        recipe.ingredients->append(Recipe_Ingredient{res2, amt2});
+    }
+    if amt3 > 0 {
+        recipe.ingredients->append(Recipe_Ingredient{res3, amt3});
+    }
+    if amt4 > 0 {
+        recipe.ingredients->append(Recipe_Ingredient{res4, amt4});
+    }
+
+    all_recipes->append(recipe);
+}
+
+add_gear_recipe :: proc(id: string, name: string, tier: int, gear_id: string, description: string,
+                       res1: Resource_Type, amt1: int, res2: Resource_Type, amt2: int,
+                       res3: Resource_Type, amt3: int, res4: Resource_Type, amt4: int) {
+    recipe := new(Recipe);
+    recipe.id = id;
+    recipe.name = name;
+    recipe.tier = tier;
+    recipe.result_type = .GEAR;
+    recipe.result_value = 0;
+    recipe.result_gear_id = gear_id;
     recipe.description = description;
 
     if amt1 > 0 {
@@ -275,6 +354,20 @@ apply_recipe_result :: proc(player: Player, recipe: Recipe) {
             player.hp += recipe.result_value;
             if player.hp > player.hp_max {
                 player.hp = player.hp_max;
+            }
+        }
+        case .GEAR: {
+            gear_defn := get_gear_definition_by_id(recipe.result_gear_id);
+            if gear_defn != null {
+                new_item := Items.create_item_instance(gear_defn, 1);
+                will_destroy: bool;
+                if Items.can_move_item_to_inventory(new_item, player.default_inventory, ref will_destroy) {
+                    Items.move_item_to_inventory(new_item, player.default_inventory);
+                } else {
+                    Items.destroy_item_instance(new_item);
+                    Notifier.notify(player, "Inventory full!");
+                    return;
+                }
             }
         }
     }
