@@ -122,7 +122,7 @@ draw_structure_button :: proc(player: Player, rect: Rect, def: Structure_Def, in
                 }
 
                 label := format_string("%:%/%", {res_defn->get_name(), have, ing.amount});
-                chip_w := label.count.(int) * 7 + 8;
+                chip_w := label.count.(float) * 7.0 + 8.0;
                 UI.text(layout->next(chip_w), ts, label);
             }
         }
@@ -185,7 +185,11 @@ handle_build_placement :: proc(player: Player) {
     panel_edge := screen.min.x + BUILD_PANEL_WIDTH.(float) * UI.get_current_scale_factor() + 20;
 
     if mouse_screen.x > panel_edge {
-        if UI.consume_click() {
+        UI.push_id("build_placement_tap");
+        world_rect := Rect{{panel_edge, screen.min.y}, {screen.max.x, screen.max.y}};
+        interact := UI.button(world_rect, {}, {}, "");
+        UI.pop_id();
+        if interact.clicked {
             def := get_structure_def_by_index(player.build_selected);
             if def != null {
                 place_structure(player, def.kind, gx, gy);

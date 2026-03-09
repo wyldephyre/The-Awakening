@@ -277,7 +277,7 @@ count_resource_in_inventory :: proc(player: Player, res_type: Resource_Type) -> 
         res_defn := defn.(Resource_Definition);
         if res_defn != null {
             if res_defn.resource_type == res_type {
-                total += item.count.(int);
+                total += item.quantity.(int);
             }
         }
     }
@@ -306,7 +306,7 @@ consume_ingredients :: proc(player: Player, recipe: Recipe) {
             if res_defn == null continue;
             if res_defn.resource_type != ing.resource_type continue;
 
-            stack := item.count.(int);
+            stack := item.quantity.(int);
             if stack <= remaining {
                 remaining -= stack;
                 Items.destroy_item_instance(item);

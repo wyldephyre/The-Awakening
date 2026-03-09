@@ -258,7 +258,7 @@ spend_structure_cost :: proc(player: Player, kind: Structure_Kind, level: int) {
             if res_defn == null continue;
             if res_defn.resource_type != ing.resource_type continue;
 
-            stack := item.count.(int);
+            stack := item.quantity.(int);
             if stack <= remaining {
                 remaining -= stack;
                 Items.destroy_item_instance(item);
