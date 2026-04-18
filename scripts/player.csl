@@ -264,5 +264,5 @@ player_take_damage :: proc(player: Player, amount: int) {
 player_die :: proc(player: Player) {
     player.is_dead = true;
     effect := new(Player_Death_Effect);
-    player.entity->set_active_effect(effect);
+    player.entity.set_active_effect(effect);
 }

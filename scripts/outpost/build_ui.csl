@@ -9,10 +9,10 @@ draw_build_mode :: proc(player: Player) {
     safe := UI.get_safe_screen_rect();
 
     // Left panel - structure selector
-    panel := safe->left_rect()->grow(0, BUILD_PANEL_WIDTH, 0, 0)->inset(10);
+    panel := safe.left_rect().grow(0, BUILD_PANEL_WIDTH, 0, 0).inset(10);
     UI.quad(panel, core_globals.white_sprite, {0.08, 0.08, 0.12, 0.85});
 
-    header := panel->cut_top(50);
+    header := panel.cut_top(50);
     ts := UI.default_text_settings();
     ts.size = 36;
     ts.color = {1, 1, 1, 1};
@@ -23,16 +23,16 @@ draw_build_mode :: proc(player: Player) {
     ts.outline_color = {0, 0, 0, 1};
     UI.text(header, ts, "Build Mode");
 
-    panel->cut_top(8);
+    panel.cut_top(8);
 
     // Structure count
-    count_rect := panel->cut_top(30);
+    count_rect := panel.cut_top(30);
     ts.size = 24;
     ts.color = {0.7, 0.7, 0.7, 1};
     count := player.outpost.data.structures.count;
     UI.text(count_rect, ts, "Structures: %/%", {count, MAX_STRUCTURES});
 
-    panel->cut_top(8);
+    panel.cut_top(8);
 
     // Structure buttons
     bs := UI.default_button_settings();
@@ -46,16 +46,16 @@ draw_build_mode :: proc(player: Player) {
         defer UI.pop_id();
 
         def := all_structure_defs[i];
-        btn_rect := panel->cut_top(65);
-        panel->cut_top(4);
+        btn_rect := panel.cut_top(65);
+        panel.cut_top(4);
 
         draw_structure_button(player, btn_rect, def, i);
     }
 
-    panel->cut_top(16);
+    panel.cut_top(16);
 
     // Close button
-    close_rect := panel->cut_top(50)->inset(0, 20, 0, 20);
+    close_rect := panel.cut_top(50).inset(0, 20, 0, 20);
     bs.sprite = get_asset(Texture_Asset, "$AO/new/modal/buttons_2/button_3.png");
     if UI.button(close_rect, bs, btn_ts, "Close").clicked {
         player.build_mode = false;
@@ -97,8 +97,8 @@ draw_structure_button :: proc(player: Player, rect: Rect, def: Structure_Def, in
     result := UI.begin_button(rect, bs, ts, ""); {
         defer UI.end_button();
 
-        content := result.rect->inset(6);
-        name_rect := content->cut_top(28);
+        content := result.rect.inset(6);
+        name_rect := content.cut_top(28);
 
         ts.halign = .LEFT;
         ts.valign = .CENTER;
@@ -121,9 +121,9 @@ draw_structure_button :: proc(player: Player, rect: Rect, def: Structure_Def, in
                     ts.color = {1.0, 0.4, 0.4, 1};
                 }
 
-                label := format_string("%:%/%", {res_defn->get_name(), have, ing.amount});
+                label := format_string("%:%/%", {res_defn.get_name(), have, ing.amount});
                 chip_w := label.count.(float) * 7.0 + 8.0;
-                UI.text(layout->next(chip_w), ts, label);
+                UI.text(layout.next(chip_w), ts, label);
             }
         }
     }
@@ -204,10 +204,10 @@ handle_build_placement :: proc(player: Player) {
 
 draw_structure_list :: proc(player: Player) {
     safe := UI.get_safe_screen_rect();
-    panel := safe->right_rect()->grow(0, 0, 0, 220)->inset(10);
+    panel := safe.right_rect().grow(0, 0, 0, 220).inset(10);
     UI.quad(panel, core_globals.white_sprite, {0.08, 0.08, 0.12, 0.85});
 
-    header := panel->cut_top(40);
+    header := panel.cut_top(40);
     ts := UI.default_text_settings();
     ts.size = 30;
     ts.color = {1, 1, 1, 1};
@@ -218,7 +218,7 @@ draw_structure_list :: proc(player: Player) {
     ts.outline_color = {0, 0, 0, 1};
     UI.text(header, ts, "Structures");
 
-    panel->cut_top(6);
+    panel.cut_top(6);
 
     for i: 0..player.outpost.data.structures.count-1 {
         UI.push_id("struct_%", {i});
@@ -228,8 +228,8 @@ draw_structure_list :: proc(player: Player) {
         def := get_structure_def_by_index(placed.kind_index);
         if def == null continue;
 
-        row := panel->cut_top(60);
-        panel->cut_top(3);
+        row := panel.cut_top(60);
+        panel.cut_top(3);
 
         draw_structure_list_row(player, row, placed, def, i);
     }
@@ -239,13 +239,13 @@ draw_structure_list_row :: proc(player: Player, row: Rect, placed: Placed_Struct
     UI.quad(row, core_globals.white_sprite, {0.12, 0.12, 0.16, 0.8});
 
     // Tier pip
-    pip := row->cut_left(6);
+    pip := row.cut_left(6);
     UI.quad(pip, core_globals.white_sprite, get_structure_color(def.kind));
 
-    content := row->inset(4);
+    content := row.inset(4);
 
     // Buttons on right
-    btn_area := content->cut_right(90);
+    btn_area := content.cut_right(90);
     bs := UI.default_button_settings();
     bs.press_scaling = 0.35;
     btn_ts := UI.default_text_settings();
@@ -253,7 +253,7 @@ draw_structure_list_row :: proc(player: Player, row: Rect, placed: Placed_Struct
     btn_ts.color = {1, 1, 1, 1};
 
     // Upgrade button
-    upgrade_rect := btn_area->cut_top(26);
+    upgrade_rect := btn_area.cut_top(26);
     can_up := placed.level < def.max_level && can_afford_structure(player, def.kind, placed.level);
     if can_up {
         bs.sprite = get_asset(Texture_Asset, "$AO/new/modal/buttons_2/button_2.png");
@@ -266,10 +266,10 @@ draw_structure_list_row :: proc(player: Player, row: Rect, placed: Placed_Struct
     }
     UI.pop_disabled();
 
-    btn_area->cut_top(3);
+    btn_area.cut_top(3);
 
     // Remove button
-    remove_rect := btn_area->cut_top(26);
+    remove_rect := btn_area.cut_top(26);
     bs.sprite = get_asset(Texture_Asset, "$AO/new/modal/buttons_2/button_3.png");
     if UI.button(remove_rect, bs, btn_ts, "Remove").clicked {
         remove_structure(player, index);
@@ -285,7 +285,7 @@ draw_structure_list_row :: proc(player: Player, row: Rect, placed: Placed_Struct
     ts.outline_thickness = 1;
     ts.outline_color = {0, 0, 0, 1};
 
-    name_rect := content->cut_top(26);
+    name_rect := content.cut_top(26);
     UI.text(name_rect, ts, "% Lv%", {def.name, placed.level});
 
     // HP

@@ -2,12 +2,12 @@ draw_hud :: proc(player: Player) {
     safe := UI.get_safe_screen_rect();
 
     // Health + pool bars in top-left
-    pool_area := safe->top_left_rect()->grow(0, 220, 220, 0)->offset(20, -20);
+    pool_area := safe.top_left_rect().grow(0, 220, 220, 0).offset(20, -20);
 
     // Health bar
-    hp_rect := pool_area->cut_top(50);
+    hp_rect := pool_area.cut_top(50);
     draw_health_bar(hp_rect, player);
-    pool_area->cut_top(8);
+    pool_area.cut_top(8);
 
     // Pool bars
     draw_pool_bar(ref pool_area, "Muscle", player.muscle, player.muscle_max, {0.8, 0.2, 0.2, 1.0});
@@ -16,7 +16,7 @@ draw_hud :: proc(player: Player) {
 
     // Zone indicator in top-right
     zone := get_zone(player.entity.world_position);
-    zone_rect := safe->top_right_rect()->grow(0, 0, 40, 120)->offset(-20, -20);
+    zone_rect := safe.top_right_rect().grow(0, 0, 40, 120).offset(-20, -20);
     ts := UI.default_text_settings();
     ts.size = 36;
     ts.color = {1, 1, 1, 1};
@@ -28,7 +28,7 @@ draw_hud :: proc(player: Player) {
     UI.text(zone_rect, ts, "Zone %", {zone});
 
     // Craft button - right side under zone
-    craft_rect := safe->top_right_rect()->grow(0, 0, 37, 105)->offset(-20, -75);
+    craft_rect := safe.top_right_rect().grow(0, 0, 37, 105).offset(-20, -75);
     craft_bs := UI.default_button_settings();
     craft_bs.sprite = get_asset(Texture_Asset, "$AO/new/modal/buttons_2/button_1.png");
     craft_bs.press_scaling = 0.35;
@@ -43,7 +43,7 @@ draw_hud :: proc(player: Player) {
     }
 
     // Build button - right side under craft
-    build_rect := safe->top_right_rect()->grow(0, 0, 37, 105)->offset(-20, -130);
+    build_rect := safe.top_right_rect().grow(0, 0, 37, 105).offset(-20, -130);
     build_bs := UI.default_button_settings();
     build_bs.press_scaling = 0.35;
     build_ts := UI.default_text_settings();
@@ -64,7 +64,7 @@ draw_hud :: proc(player: Player) {
     }
 
     // Gear button - right side under build
-    gear_rect := safe->top_right_rect()->grow(0, 0, 37, 105)->offset(-20, -185);
+    gear_rect := safe.top_right_rect().grow(0, 0, 37, 105).offset(-20, -185);
     gear_bs := UI.default_button_settings();
     gear_bs.press_scaling = 0.35;
     gear_ts := UI.default_text_settings();
@@ -84,7 +84,7 @@ draw_hud :: proc(player: Player) {
     }
 
     // Quest log button - right side under gear
-    quest_rect := safe->top_right_rect()->grow(0, 0, 37, 105)->offset(-20, -240);
+    quest_rect := safe.top_right_rect().grow(0, 0, 37, 105).offset(-20, -240);
     quest_bs := UI.default_button_settings();
     quest_bs.press_scaling = 0.35;
     quest_ts := UI.default_text_settings();
@@ -114,7 +114,7 @@ draw_health_bar :: proc(bar_rect: Rect, player: Player) {
     pct = clamp(pct, 0.0, 1.0);
 
     if pct > 0 {
-        filled := bar_rect->subrect(0, 0, pct, 1);
+        filled := bar_rect.subrect(0, 0, pct, 1);
         fill_color := lerp(v4{0.8, 0.1, 0.1, 1.0}, {0.1, 0.8, 0.1, 1.0}, pct);
         UI.quad(filled, core_globals.white_sprite, fill_color);
     }
@@ -131,9 +131,9 @@ draw_health_bar :: proc(bar_rect: Rect, player: Player) {
 }
 
 draw_pool_bar :: proc(area: ref Rect, name: string, current: int, max_val: int, color: v4) {
-    bar_rect := area->cut_top(45);
-    label_rect := bar_rect->cut_left(80);
-    value_rect := bar_rect->cut_right(60);
+    bar_rect := area.cut_top(45);
+    label_rect := bar_rect.cut_left(80);
+    value_rect := bar_rect.cut_right(60);
     fill_area := bar_rect;
 
     // Background
@@ -147,7 +147,7 @@ draw_pool_bar :: proc(area: ref Rect, name: string, current: int, max_val: int, 
     if pct > 1.0 {
         pct = 1.0;
     }
-    filled := fill_area->subrect(0, 0, pct, 1);
+    filled := fill_area.subrect(0, 0, pct, 1);
     UI.quad(filled, core_globals.white_sprite, color);
 
     // Label text
@@ -166,5 +166,5 @@ draw_pool_bar :: proc(area: ref Rect, name: string, current: int, max_val: int, 
     UI.text(value_rect, ts, "%/%", {current, max_val});
 
     // Spacing between bars
-    area->cut_top(5);
+    area.cut_top(5);
 }

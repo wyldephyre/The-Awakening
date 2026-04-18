@@ -88,7 +88,7 @@ add_quest :: proc(id: string, name: string, description: string,
     q.reward_resource = reward_resource;
     q.reward_amount = reward_amount;
     q.zone_requirement = zone_requirement;
-    all_quest_defs->append(q);
+    all_quest_defs.append(q);
 }
 
 get_quest_def :: proc(index: int) -> Quest_Def {

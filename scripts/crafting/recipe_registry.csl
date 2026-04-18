@@ -61,7 +61,7 @@ register_resource :: proc(id: string, name: string, res_type: Resource_Type, res
     defn := Items.register_item_definition(desc, Resource_Definition, Item_Instance);
     defn.resource_type = res_type;
     defn.resource_tier = resource_tier;
-    all_resource_definitions->append(defn);
+    all_resource_definitions.append(defn);
 }
 
 get_resource_definition :: proc(res_type: Resource_Type) -> Resource_Definition {
@@ -215,19 +215,19 @@ add_recipe :: proc(id: string, name: string, tier: int, result_type: Recipe_Resu
     recipe.description = description;
 
     if amt1 > 0 {
-        recipe.ingredients->append(Recipe_Ingredient{res1, amt1});
+        recipe.ingredients.append(Recipe_Ingredient{res1, amt1});
     }
     if amt2 > 0 {
-        recipe.ingredients->append(Recipe_Ingredient{res2, amt2});
+        recipe.ingredients.append(Recipe_Ingredient{res2, amt2});
     }
     if amt3 > 0 {
-        recipe.ingredients->append(Recipe_Ingredient{res3, amt3});
+        recipe.ingredients.append(Recipe_Ingredient{res3, amt3});
     }
     if amt4 > 0 {
-        recipe.ingredients->append(Recipe_Ingredient{res4, amt4});
+        recipe.ingredients.append(Recipe_Ingredient{res4, amt4});
     }
 
-    all_recipes->append(recipe);
+    all_recipes.append(recipe);
 }
 
 add_gear_recipe :: proc(id: string, name: string, tier: int, gear_id: string, description: string,
@@ -243,19 +243,19 @@ add_gear_recipe :: proc(id: string, name: string, tier: int, gear_id: string, de
     recipe.description = description;
 
     if amt1 > 0 {
-        recipe.ingredients->append(Recipe_Ingredient{res1, amt1});
+        recipe.ingredients.append(Recipe_Ingredient{res1, amt1});
     }
     if amt2 > 0 {
-        recipe.ingredients->append(Recipe_Ingredient{res2, amt2});
+        recipe.ingredients.append(Recipe_Ingredient{res2, amt2});
     }
     if amt3 > 0 {
-        recipe.ingredients->append(Recipe_Ingredient{res3, amt3});
+        recipe.ingredients.append(Recipe_Ingredient{res3, amt3});
     }
     if amt4 > 0 {
-        recipe.ingredients->append(Recipe_Ingredient{res4, amt4});
+        recipe.ingredients.append(Recipe_Ingredient{res4, amt4});
     }
 
-    all_recipes->append(recipe);
+    all_recipes.append(recipe);
 }
 
 get_recipe_count :: proc() -> int {

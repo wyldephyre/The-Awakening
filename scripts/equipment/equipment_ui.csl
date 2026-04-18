@@ -8,11 +8,11 @@ draw_equipment_panel :: proc(player: Player) {
     UI.quad(UI.get_screen_rect(), core_globals.white_sprite, {0, 0, 0, 0.65});
 
     // Panel
-    panel := safe->center_rect()->grow(300, 240, 300, 240);
+    panel := safe.center_rect().grow(300, 240, 300, 240);
     UI.quad(panel, core_globals.white_sprite, {0.1, 0.1, 0.15, 0.95});
 
     // Header
-    header := panel->cut_top(60);
+    header := panel.cut_top(60);
     UI.quad(header, core_globals.white_sprite, {0.15, 0.15, 0.2, 1});
 
     ts := UI.default_text_settings();
@@ -32,25 +32,25 @@ draw_equipment_panel :: proc(player: Player) {
     close_ts := UI.default_text_settings();
     close_ts.size = 36;
     close_ts.color = {1, 1, 1, 1};
-    close_rect := header->top_right_rect()->grow(32, 0, 32, 65);
+    close_rect := header.top_right_rect().grow(32, 0, 32, 65);
     if UI.button(close_rect, bs, close_ts, "X").clicked {
         player.gear_open = false;
         return;
     }
 
-    panel->cut_top(10);
+    panel.cut_top(10);
 
     // Equipped slots
     draw_equipped_slot(player, ref panel, "Weapon", .WEAPON);
     draw_equipped_slot(player, ref panel, "Armor", .ARMOR);
     draw_equipped_slot(player, ref panel, "Accessory", .ACCESSORY);
 
-    panel->cut_top(12);
+    panel.cut_top(12);
 
     // Stat summary
     draw_gear_stats(player, ref panel);
 
-    panel->cut_top(12);
+    panel.cut_top(12);
 
     // Inventory gear list (equippable items)
     draw_equippable_list(player, ref panel);
@@ -60,20 +60,20 @@ draw_equipped_slot :: proc(player: Player, panel: ref Rect, label: string, slot:
     UI.push_id("slot_%", {label});
     defer UI.pop_id();
 
-    row := panel->cut_top(70);
-    panel->cut_top(4);
+    row := panel.cut_top(70);
+    panel.cut_top(4);
 
     UI.quad(row, core_globals.white_sprite, {0.14, 0.14, 0.18, 0.8});
 
     // Slot color pip
-    pip := row->cut_left(8);
+    pip := row.cut_left(8);
     pip_color := get_slot_color(slot);
     UI.quad(pip, core_globals.white_sprite, pip_color);
 
-    content := row->inset(6);
+    content := row.inset(6);
 
     // Unequip button on right
-    btn_area := content->cut_right(90);
+    btn_area := content.cut_right(90);
     equipped_def := get_equipped_def(player, slot);
 
     bs := UI.default_button_settings();
@@ -84,7 +84,7 @@ draw_equipped_slot :: proc(player: Player, panel: ref Rect, label: string, slot:
 
     if equipped_def != null {
         bs.sprite = get_asset(Texture_Asset, "$AO/new/modal/buttons_2/button_3.png");
-        if UI.button(btn_area->inset(4), bs, btn_ts, "Unequip").clicked {
+        if UI.button(btn_area.inset(4), bs, btn_ts, "Unequip").clicked {
             unequip_slot(player, slot);
         }
     }
@@ -98,7 +98,7 @@ draw_equipped_slot :: proc(player: Player, panel: ref Rect, label: string, slot:
     ts.outline_thickness = 1;
     ts.outline_color = {0, 0, 0, 1};
 
-    label_rect := content->cut_top(28);
+    label_rect := content.cut_top(28);
     ts.color = {0.7, 0.7, 0.7, 1};
     UI.text(label_rect, ts, label);
 
@@ -113,7 +113,7 @@ draw_equipped_slot :: proc(player: Player, panel: ref Rect, label: string, slot:
 }
 
 draw_gear_stats :: proc(player: Player, panel: ref Rect) {
-    stats_rect := panel->cut_top(60);
+    stats_rect := panel.cut_top(60);
     UI.quad(stats_rect, core_globals.white_sprite, {0.12, 0.12, 0.16, 0.7});
 
     ts := UI.default_text_settings();
@@ -125,23 +125,23 @@ draw_gear_stats :: proc(player: Player, panel: ref Rect) {
     ts.outline_color = {0, 0, 0, 1};
     ts.color = {0.8, 0.8, 0.8, 1};
 
-    inner := stats_rect->inset(6);
-    top_row := inner->cut_top(26);
+    inner := stats_rect.inset(6);
+    top_row := inner.cut_top(26);
 
     layout := UI.make_directional_layout(top_row, .RIGHT);
     ts.color = {1, 0.6, 0.3, 1};
-    UI.text(layout->next(130), ts, "DMG: +%", {player.gear_damage_bonus});
+    UI.text(layout.next(130), ts, "DMG: +%", {player.gear_damage_bonus});
     ts.color = {0.3, 0.9, 0.3, 1};
-    UI.text(layout->next(120), ts, "HP: +%", {player.gear_hp_bonus});
+    UI.text(layout.next(120), ts, "HP: +%", {player.gear_hp_bonus});
 
     bot_row := inner;
     layout2 := UI.make_directional_layout(bot_row, .RIGHT);
     ts.color = {0.8, 0.3, 0.3, 1};
-    UI.text(layout2->next(100), ts, "MUS: +%", {player.gear_muscle_bonus});
+    UI.text(layout2.next(100), ts, "MUS: +%", {player.gear_muscle_bonus});
     ts.color = {0.3, 0.5, 0.9, 1};
-    UI.text(layout2->next(100), ts, "SPK: +%", {player.gear_spark_bonus});
+    UI.text(layout2.next(100), ts, "SPK: +%", {player.gear_spark_bonus});
     ts.color = {0.3, 0.8, 0.3, 1};
-    UI.text(layout2->next(100), ts, "EDG: +%", {player.gear_edge_bonus});
+    UI.text(layout2.next(100), ts, "EDG: +%", {player.gear_edge_bonus});
 }
 
 draw_equippable_list :: proc(player: Player, panel: ref Rect) {
@@ -154,25 +154,25 @@ draw_equippable_list :: proc(player: Player, panel: ref Rect) {
     ts.outline_thickness = 1;
     ts.outline_color = {0, 0, 0, 1};
 
-    title_rect := panel->cut_top(30);
+    title_rect := panel.cut_top(30);
     UI.text(title_rect, ts, "Inventory Gear:");
 
-    panel->cut_top(4);
+    panel.cut_top(4);
 
     // Scan inventory for gear items
     for i: 0..player.default_inventory.capacity-1 {
-        item := player.default_inventory->get_item(i);
+        item := player.default_inventory.get_item(i);
         if item == null continue;
 
-        defn := item->get_definition();
+        defn := item.get_definition();
         gear_defn := defn.(Gear_Definition);
         if gear_defn == null continue;
 
         UI.push_id("inv_gear_%", {i});
         defer UI.pop_id();
 
-        row := panel->cut_top(55);
-        panel->cut_top(3);
+        row := panel.cut_top(55);
+        panel.cut_top(3);
 
         draw_inventory_gear_row(player, row, gear_defn, i);
     }
@@ -181,13 +181,13 @@ draw_equippable_list :: proc(player: Player, panel: ref Rect) {
 draw_inventory_gear_row :: proc(player: Player, row: Rect, gear_defn: Gear_Definition, inv_index: int) {
     UI.quad(row, core_globals.white_sprite, {0.13, 0.13, 0.17, 0.7});
 
-    pip := row->cut_left(6);
+    pip := row.cut_left(6);
     UI.quad(pip, core_globals.white_sprite, get_slot_color(gear_defn.slot));
 
-    content := row->inset(4);
+    content := row.inset(4);
 
     // Equip button
-    btn_area := content->cut_right(85);
+    btn_area := content.cut_right(85);
     bs := UI.default_button_settings();
     bs.sprite = get_asset(Texture_Asset, "$AO/new/modal/buttons_2/button_2.png");
     bs.press_scaling = 0.35;
@@ -195,7 +195,7 @@ draw_inventory_gear_row :: proc(player: Player, row: Rect, gear_defn: Gear_Defin
     btn_ts.size = 22;
     btn_ts.color = {1, 1, 1, 1};
 
-    if UI.button(btn_area->inset(3), bs, btn_ts, "Equip").clicked {
+    if UI.button(btn_area.inset(3), bs, btn_ts, "Equip").clicked {
         equip_from_inventory(player, inv_index);
     }
 
@@ -209,8 +209,8 @@ draw_inventory_gear_row :: proc(player: Player, row: Rect, gear_defn: Gear_Defin
     ts.outline_color = {0, 0, 0, 1};
     ts.color = {1, 1, 1, 1};
 
-    name_rect := content->cut_top(26);
-    UI.text(name_rect, ts, gear_defn->get_name());
+    name_rect := content.cut_top(26);
+    UI.text(name_rect, ts, gear_defn.get_name());
 
     ts.size = 20;
     ts.color = {0.6, 0.6, 0.6, 1};

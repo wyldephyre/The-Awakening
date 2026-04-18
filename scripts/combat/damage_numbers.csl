@@ -16,7 +16,7 @@ spawn_damage_number :: proc(position: v2, value: int, color: v4) {
     dn.value = value;
     dn.timer = 0;
     dn.color = color;
-    g_damage_numbers->append(dn);
+    g_damage_numbers.append(dn);
 }
 
 update_damage_numbers :: proc(dt: float) {
@@ -28,7 +28,7 @@ update_damage_numbers :: proc(dt: float) {
         g_damage_numbers[i].position.y += DAMAGE_NUMBER_RISE_SPEED * dt;
 
         if g_damage_numbers[i].timer >= DAMAGE_NUMBER_LIFETIME {
-            g_damage_numbers->unordered_remove_by_index(i);
+            g_damage_numbers.unordered_remove_by_index(i);
         } else {
             i += 1;
         }

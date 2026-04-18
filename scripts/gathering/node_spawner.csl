@@ -72,14 +72,14 @@ spawn_node_in_zone :: proc(zone: int) {
     kind := pick_node_kind_for_zone(zone);
 
     ent := Scene.create_entity();
-    ent->set_local_position(pos);
-    ent->set_local_scale({0.5, 0.5});
+    ent.set_local_position(pos);
+    ent.set_local_scale({0.5, 0.5});
 
-    sprite := ent->add_component(Sprite_Renderer);
-    sprite->set_texture(core_globals.white_sprite);
+    sprite := ent.add_component(Sprite_Renderer);
+    sprite.set_texture(core_globals.white_sprite);
     sprite.layer = -1;
 
-    node := ent->add_component(Harvest_Node);
+    node := ent.add_component(Harvest_Node);
     node.kind = kind;
 }
 

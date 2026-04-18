@@ -32,7 +32,7 @@ Enemy :: class : Component {
         spawn_origin = entity.local_position;
         state = .IDLE;
         idle_timer = rng_range_float(ref rng, 0, ENEMY_IDLE_TIME);
-        sprite = entity->get_component(Sprite_Renderer);
+        sprite = entity.get_component(Sprite_Renderer);
     }
 
     ao_update :: method(dt: float) {
@@ -67,7 +67,7 @@ Enemy :: class : Component {
                         idle_timer = rng_range_float(ref rng, 1, ENEMY_IDLE_TIME);
                     } else {
                         move_dir := normalize(dir);
-                        entity->add_local_position(move_dir * speed * 0.5 * dt);
+                        entity.add_local_position(move_dir * speed * 0.5 * dt);
                         update_enemy_facing(move_dir);
                     }
 
@@ -96,7 +96,7 @@ Enemy :: class : Component {
                             }
                         } else {
                             move_dir := normalize(dir);
-                            entity->add_local_position(move_dir * speed * dt);
+                            entity.add_local_position(move_dir * speed * dt);
                             update_enemy_facing(move_dir);
                         }
                     }

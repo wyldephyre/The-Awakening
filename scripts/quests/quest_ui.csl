@@ -8,12 +8,12 @@ draw_quest_tracker :: proc(player: Player) {
     if def == null return;
 
     safe := UI.get_safe_screen_rect();
-    tracker := safe->left_rect()->grow(0, 240, 0, 0)->inset(80, 0, 0, 10);
-    tracker = tracker->cut_top(80);
+    tracker := safe.left_rect().grow(0, 240, 0, 0).inset(80, 0, 0, 10);
+    tracker = tracker.cut_top(80);
 
     UI.quad(tracker, core_globals.white_sprite, {0, 0, 0, 0.4});
 
-    content := tracker->inset(6);
+    content := tracker.inset(6);
 
     ts := UI.default_text_settings();
     ts.size = 22;
@@ -24,19 +24,19 @@ draw_quest_tracker :: proc(player: Player) {
     ts.outline_color = {0, 0, 0, 1};
 
     // Quest name
-    name_rect := content->cut_top(24);
+    name_rect := content.cut_top(24);
     ts.color = {1, 0.85, 0.3, 1};
     UI.text(name_rect, ts, def.name);
 
     // Description
-    desc_rect := content->cut_top(22);
+    desc_rect := content.cut_top(22);
     ts.size = 18;
     ts.color = {0.8, 0.8, 0.8, 1};
     UI.text(desc_rect, ts, def.description);
 
     // Progress bar
-    content->cut_top(4);
-    bar_rect := content->cut_top(16);
+    content.cut_top(4);
+    bar_rect := content.cut_top(16);
     UI.quad(bar_rect, core_globals.white_sprite, {0.15, 0.15, 0.2, 0.8});
 
     progress := get_current_progress(player);
@@ -47,7 +47,7 @@ draw_quest_tracker :: proc(player: Player) {
     }
     if pct > 1.0 { pct = 1.0; }
     if pct > 0 {
-        filled := bar_rect->subrect(0, 0, pct, 1);
+        filled := bar_rect.subrect(0, 0, pct, 1);
         UI.quad(filled, core_globals.white_sprite, {0.3, 0.8, 0.3, 0.9});
     }
 
@@ -72,11 +72,11 @@ draw_quest_log :: proc(player: Player) {
 
     UI.quad(UI.get_screen_rect(), core_globals.white_sprite, {0, 0, 0, 0.65});
 
-    panel := safe->center_rect()->grow(300, 260, 300, 260);
+    panel := safe.center_rect().grow(300, 260, 300, 260);
     UI.quad(panel, core_globals.white_sprite, {0.1, 0.1, 0.15, 0.95});
 
     // Header
-    header := panel->cut_top(60);
+    header := panel.cut_top(60);
     UI.quad(header, core_globals.white_sprite, {0.15, 0.15, 0.2, 1});
 
     ts := UI.default_text_settings();
@@ -96,13 +96,13 @@ draw_quest_log :: proc(player: Player) {
     close_ts := UI.default_text_settings();
     close_ts.size = 36;
     close_ts.color = {1, 1, 1, 1};
-    close_rect := header->top_right_rect()->grow(32, 0, 32, 65);
+    close_rect := header.top_right_rect().grow(32, 0, 32, 65);
     if UI.button(close_rect, bs, close_ts, "X").clicked {
         player.quest_log_open = false;
         return;
     }
 
-    panel->cut_top(8);
+    panel.cut_top(8);
 
     // Quest list
     for i: 0..all_quest_defs.count-1 {
@@ -110,8 +110,8 @@ draw_quest_log :: proc(player: Player) {
         defer UI.pop_id();
 
         def := all_quest_defs[i];
-        row := panel->cut_top(65);
-        panel->cut_top(3);
+        row := panel.cut_top(65);
+        panel.cut_top(3);
 
         draw_quest_log_row(player, row, def, i);
     }
@@ -133,7 +133,7 @@ draw_quest_log_row :: proc(player: Player, row: Rect, def: Quest_Def, index: int
     UI.quad(row, core_globals.white_sprite, bg_color);
 
     // Status pip
-    pip := row->cut_left(8);
+    pip := row.cut_left(8);
     pip_color := v4{0.3, 0.3, 0.3, 1};
     if is_complete {
         pip_color = {0.3, 0.9, 0.3, 1};
@@ -142,7 +142,7 @@ draw_quest_log_row :: proc(player: Player, row: Rect, def: Quest_Def, index: int
     }
     UI.quad(pip, core_globals.white_sprite, pip_color);
 
-    content := row->inset(6);
+    content := row.inset(6);
 
     ts := UI.default_text_settings();
     ts.halign = .LEFT;
@@ -152,7 +152,7 @@ draw_quest_log_row :: proc(player: Player, row: Rect, def: Quest_Def, index: int
     ts.outline_color = {0, 0, 0, 1};
 
     // Quest name
-    name_rect := content->cut_top(26);
+    name_rect := content.cut_top(26);
     ts.size = 24;
     if is_complete {
         ts.color = {0.5, 0.8, 0.5, 1};
@@ -191,7 +191,7 @@ draw_quest_log_row :: proc(player: Player, row: Rect, def: Quest_Def, index: int
                 display_progress = target;
             }
 
-            prog_rect := row->cut_right(80)->inset(4);
+            prog_rect := row.cut_right(80).inset(4);
             ts.size = 22;
             ts.halign = .CENTER;
             ts.valign = .CENTER;
