@@ -159,7 +159,7 @@ draw_build_ghost :: proc(player: Player) {
     defer UI.pop_z();
 
     ghost_pos := v2{snap_x, snap_y};
-    ghost_rect := Rect{ghost_pos, ghost_pos}->grow(0.4, 0.4, 0.4, 0.4);
+    ghost_rect := Rect{ghost_pos, ghost_pos}.grow(0.4, 0.4, 0.4, 0.4);
 
     ghost_color := v4{0.3, 1.0, 0.3, 0.4};
     if !valid {

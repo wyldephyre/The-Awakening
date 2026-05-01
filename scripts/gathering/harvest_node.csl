@@ -73,11 +73,11 @@ Harvest_Node :: class : Interactable {
     rng: u64;
 
     ao_start :: method() {
-        this->set_listener(this);
+        this.set_listener(this);
         rng = rng_seed(entity.id);
 
         info := get_node_info(kind);
-        this->set_text(format_string("% %", {info.gather_text, info.name}));
+        this.set_text(format_string("% %", {info.gather_text, info.name}));
         required_hold_time = GATHER_HOLD_TIME;
         radius = 1.5;
         prompt_offset = {0, 0.8};
@@ -85,7 +85,7 @@ Harvest_Node :: class : Interactable {
         hits_max = info.hits_required;
         hits_remaining = hits_max;
 
-        sprite = entity->get_component(Sprite_Renderer);
+        sprite = entity.get_component(Sprite_Renderer);
         if sprite != null {
             sprite.color = info.color;
         }
@@ -115,7 +115,6 @@ Harvest_Node :: class : Interactable {
 
     ao_update :: method(dt: float) {
         if !depleted return;
-        if !Game.is_server() return;
 
         if get_time() - depleted_time >= NODE_RESPAWN_TIME {
             respawn_node(this);
@@ -134,13 +133,13 @@ Harvest_Node :: class : Interactable {
         defer UI.pop_z();
 
         bar_pos := pos + v2{0, 0.7};
-        bar_rect := Rect{bar_pos, bar_pos}->grow(0.04, 0.35, 0.04, 0.35);
+        bar_rect := Rect{bar_pos, bar_pos}.grow(0.04, 0.35, 0.04, 0.35);
 
         UI.quad(bar_rect, core_globals.white_sprite, {0, 0, 0, 0.6});
 
         pct := hits_remaining.(float) / hits_max.(float);
         if pct > 0 {
-            fill_rect := bar_rect->subrect(0, 0, pct, 1);
+            fill_rect := bar_rect.subrect(0, 0, pct, 1);
             info := get_node_info(kind);
             UI.quad(fill_rect, core_globals.white_sprite, info.color);
         }
@@ -159,8 +158,8 @@ harvest_node_drop :: proc(node: Harvest_Node, player: Player) {
     for i: 0..drop_count-1 {
         item := Items.create_item_instance(defn, 1);
         dropped := Dropped_Item.spawn(node.entity.world_position, item);
-        dropped->set_exclusive(player);
-        dropped->do_spawn_animation(ref node.rng);
+        dropped.set_exclusive(player);
+        dropped.do_spawn_animation(ref node.rng);
     }
 
     on_quest_resource_gathered(player, drop_count);

@@ -86,12 +86,12 @@ register_gear_item :: proc(id: string, name: string, slot: Gear_Slot, tier: int,
     defn.spark_bonus = spark_bonus;
     defn.edge_bonus = edge_bonus;
     defn.description = description;
-    all_gear_definitions->append(defn);
+    all_gear_definitions.append(defn);
 }
 
 get_gear_definition_by_id :: proc(id: string) -> Gear_Definition {
     for defn: all_gear_definitions {
-        if defn->get_id() == id return defn;
+        if defn.get_id() == id return defn;
     }
     return null;
 }
@@ -127,10 +127,10 @@ save_equipment :: proc(player: Player) {
 // ---------------------------------------------------------------------------
 
 equip_from_inventory :: proc(player: Player, slot_index: int) -> bool {
-    item := player.default_inventory->get_item(slot_index.(s64));
+    item := player.default_inventory.get_item(slot_index.(s64));
     if item == null return false;
 
-    defn := item->get_definition();
+    defn := item.get_definition();
     gear_defn := defn.(Gear_Definition);
     if gear_defn == null return false;
 
@@ -139,9 +139,9 @@ equip_from_inventory :: proc(player: Player, slot_index: int) -> bool {
 
     // Set equipped id
     switch gear_defn.slot {
-        case .WEAPON:    { player.equipment.weapon_id = gear_defn->get_id(); }
-        case .ARMOR:     { player.equipment.armor_id = gear_defn->get_id(); }
-        case .ACCESSORY: { player.equipment.accessory_id = gear_defn->get_id(); }
+        case .WEAPON:    { player.equipment.weapon_id = gear_defn.get_id(); }
+        case .ARMOR:     { player.equipment.armor_id = gear_defn.get_id(); }
+        case .ACCESSORY: { player.equipment.accessory_id = gear_defn.get_id(); }
     }
 
     // Remove from inventory
@@ -149,7 +149,7 @@ equip_from_inventory :: proc(player: Player, slot_index: int) -> bool {
 
     recalculate_gear_bonuses(player);
     save_equipment(player);
-    Notifier.notify(player, format_string("Equipped %!", {gear_defn->get_name()}));
+    Notifier.notify(player, format_string("Equipped %!", {gear_defn.get_name()}));
     on_quest_gear_equipped(player);
     return true;
 }
@@ -180,7 +180,7 @@ unequip_slot :: proc(player: Player, slot: Gear_Slot) -> bool {
         clear_equipment_slot(player, slot);
         recalculate_gear_bonuses(player);
         save_equipment(player);
-        Notifier.notify(player, format_string("Unequipped %.", {defn->get_name()}));
+        Notifier.notify(player, format_string("Unequipped %.", {defn.get_name()}));
         return true;
     } else {
         Items.destroy_item_instance(new_item);
@@ -273,7 +273,7 @@ get_equipped_name :: proc(player: Player, slot: Gear_Slot) -> string {
     if equipped_id == "" return "Empty";
     defn := get_gear_definition_by_id(equipped_id);
     if defn == null return "Empty";
-    return defn->get_name();
+    return defn.get_name();
 }
 
 get_equipped_def :: proc(player: Player, slot: Gear_Slot) -> Gear_Definition {

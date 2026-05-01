@@ -271,9 +271,9 @@ get_recipe :: proc(index: int) -> Recipe {
 count_resource_in_inventory :: proc(player: Player, res_type: Resource_Type) -> int {
     total := 0;
     for i: 0..player.default_inventory.capacity-1 {
-        item := player.default_inventory->get_item(i);
+        item := player.default_inventory.get_item(i);
         if item == null continue;
-        defn := item->get_definition();
+        defn := item.get_definition();
         res_defn := defn.(Resource_Definition);
         if res_defn != null {
             if res_defn.resource_type == res_type {
@@ -299,9 +299,9 @@ consume_ingredients :: proc(player: Player, recipe: Recipe) {
         remaining := ing.amount;
         for i: 0..player.default_inventory.capacity-1 {
             if remaining <= 0 break;
-            item := player.default_inventory->get_item(i);
+            item := player.default_inventory.get_item(i);
             if item == null continue;
-            defn := item->get_definition();
+            defn := item.get_definition();
             res_defn := defn.(Resource_Definition);
             if res_defn == null continue;
             if res_defn.resource_type != ing.resource_type continue;

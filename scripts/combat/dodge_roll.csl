@@ -43,6 +43,8 @@ Roll_Effect :: class : Effect_Base {
 
     effect_end :: method(interrupt: bool) {
         player.agent.friction = original_friction;
-        player.invulnerable = false;
+        if player.invulnerable_timer <= 0 {
+            player.invulnerable = false;
+        }
     }
 }

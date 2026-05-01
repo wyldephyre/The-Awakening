@@ -15,7 +15,7 @@ Player_Death_Effect :: class : Effect_Base {
             ts := UI.default_text_settings();
             ts.size = 64;
             ts.color = {1, 0.3, 0.3, 1};
-            rect := safe.center_rect()->grow(40, 200, 40, 200);
+            rect := safe.center_rect().grow(40, 200, 40, 200);
             UI.text(rect, ts, "Respawning in %...", {time_left.(int) + 1});
         }
 

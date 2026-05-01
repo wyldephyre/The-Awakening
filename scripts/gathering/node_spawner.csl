@@ -32,7 +32,7 @@ try_spawn_nodes :: proc() {
     z3 := 0;
     z4 := 0;
 
-    foreach node: component_iterator(Harvest_Node) {
+    for node: component_iterator(Harvest_Node) {
         info := get_node_info(node.kind);
         if info.zone == 1 { z1 += 1; }
         else if info.zone == 2 { z2 += 1; }

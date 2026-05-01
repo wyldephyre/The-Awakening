@@ -54,7 +54,7 @@ Player :: class : Player_Base {
         // Detect host
         host_id, has_host := Server.get_private_server_host_id();
         if has_host {
-            is_host = (this->get_user_id() == host_id);
+            is_host = (this.get_user_id() == host_id);
             if is_host {
                 has_build_permission = true;
             }
@@ -67,7 +67,7 @@ Player :: class : Player_Base {
         load_player_data(this);
 
         if !character_created {
-            this->add_freeze_reason("character_creation");
+            this.add_freeze_reason("character_creation");
         }
 
         build_selected = -1;
@@ -80,33 +80,31 @@ Player :: class : Player_Base {
     }
 
     ao_update :: method(dt: float) {
-        if Game.is_server() {
-            regen_timer += dt;
-            if regen_timer >= POOL_REGEN_INTERVAL {
-                regen_timer -= POOL_REGEN_INTERVAL;
-                if muscle < muscle_max {
-                    muscle += 1;
-                }
-                if spark < spark_max {
-                    spark += 1;
-                }
-                if edge < edge_max {
-                    edge += 1;
-                }
+        regen_timer += dt;
+        if regen_timer >= POOL_REGEN_INTERVAL {
+            regen_timer -= POOL_REGEN_INTERVAL;
+            if muscle < muscle_max {
+                muscle += 1;
             }
+            if spark < spark_max {
+                spark += 1;
+            }
+            if edge < edge_max {
+                edge += 1;
+            }
+        }
 
-            if invulnerable_timer > 0 {
-                invulnerable_timer -= dt;
-                if invulnerable_timer <= 0 {
-                    invulnerable = false;
-                    invulnerable_timer = 0;
-                }
+        if invulnerable_timer > 0 {
+            invulnerable_timer -= dt;
+            if invulnerable_timer <= 0 {
+                invulnerable = false;
+                invulnerable_timer = 0;
             }
         }
     }
 
     ao_late_update :: method(dt: float) {
-        if this->is_local_or_server() {
+        if this.is_local_or_server() {
             if !character_created {
                 draw_character_creation(this);
             } else {

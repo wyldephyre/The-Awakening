@@ -1389,6 +1389,9 @@ Player_Base :: class : AO_Player {
     add_disable_movement_input_reason    :: method(reason: string) #foreign "player_add_disable_movement_input_reason";
     remove_disable_movement_input_reason :: method(reason: string) #foreign "player_remove_disable_movement_input_reason";
 
+    add_joystick_disable_reason    :: method(reason: string) #foreign "player_add_joystick_disable_reason";
+    remove_joystick_disable_reason :: method(reason: string) #foreign "player_remove_joystick_disable_reason";
+
     is_local_or_server :: method() -> bool #foreign "player_is_local_or_server";
     is_local           :: method() -> bool #foreign "player_is_local";
 
@@ -3331,6 +3334,6 @@ UIK :: struct {
     }
 
     rect_dialog :: proc() -> Rect {
-        return UI.get_safe_screen_rect().top_rect().grow_bottom(275).inset(0, 800, 0, 800).offset(0, 165);
+        return UI.get_safe_screen_rect().top_rect().grow_bottom(275).inset(0, 800, 0, 800).offset(0, 0);
     }
 }

@@ -37,9 +37,9 @@ draw_crafting_panel :: proc(player: Player) {
     close_ts.size = 36;
     close_ts.color = {1, 1, 1, 1};
 
-    close_rect := header.right_rect().grow(0, 0, 32, 0)->offset(0, 0)->cut_right(65)->cut_top(65);
+    close_rect := header.right_rect().grow(0, 0, 32, 0).offset(0, 0).cut_right(65).cut_top(65);
     close_rect = close_rect.offset(0, 0);
-    close_rect2 := header.top_right_rect()->grow(32, 0, 32, 65);
+    close_rect2 := header.top_right_rect().grow(32, 0, 32, 65);
     if UI.button(close_rect2, bs, close_ts, "X").clicked {
         player.crafting_open = false;
         return;

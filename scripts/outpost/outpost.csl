@@ -35,13 +35,13 @@ register_structure_defs :: proc() {
     wall.levels[0] = Structure_Level_Data{50, 0};
     wall.levels[1] = Structure_Level_Data{100, 0};
     wall.levels[2] = Structure_Level_Data{200, 0};
-    wall.costs[0]->append(Recipe_Ingredient{.SALVAGE, 5});
-    wall.costs[0]->append(Recipe_Ingredient{.SCRAP_METAL, 3});
-    wall.costs[1]->append(Recipe_Ingredient{.SCRAP_METAL, 6});
-    wall.costs[1]->append(Recipe_Ingredient{.ALLOY_COMPONENT, 2});
-    wall.costs[2]->append(Recipe_Ingredient{.ALLOY_COMPONENT, 5});
-    wall.costs[2]->append(Recipe_Ingredient{.FACTION_TECH, 2});
-    all_structure_defs->append(wall);
+    wall.costs[0].append(Recipe_Ingredient{.SALVAGE, 5});
+    wall.costs[0].append(Recipe_Ingredient{.SCRAP_METAL, 3});
+    wall.costs[1].append(Recipe_Ingredient{.SCRAP_METAL, 6});
+    wall.costs[1].append(Recipe_Ingredient{.ALLOY_COMPONENT, 2});
+    wall.costs[2].append(Recipe_Ingredient{.ALLOY_COMPONENT, 5});
+    wall.costs[2].append(Recipe_Ingredient{.FACTION_TECH, 2});
+    all_structure_defs.append(wall);
 
     // Watchtower - increases nearby detection range
     tower := new(Structure_Def);
@@ -51,13 +51,13 @@ register_structure_defs :: proc() {
     tower.levels[0] = Structure_Level_Data{30, 5};
     tower.levels[1] = Structure_Level_Data{60, 8};
     tower.levels[2] = Structure_Level_Data{100, 12};
-    tower.costs[0]->append(Recipe_Ingredient{.SALVAGE, 4});
-    tower.costs[0]->append(Recipe_Ingredient{.WATER, 2});
-    tower.costs[1]->append(Recipe_Ingredient{.FUEL_CELL, 3});
-    tower.costs[1]->append(Recipe_Ingredient{.NEXUS_CRYSTAL, 2});
-    tower.costs[2]->append(Recipe_Ingredient{.VOLATILE_SHARD, 2});
-    tower.costs[2]->append(Recipe_Ingredient{.FACTION_TECH, 3});
-    all_structure_defs->append(tower);
+    tower.costs[0].append(Recipe_Ingredient{.SALVAGE, 4});
+    tower.costs[0].append(Recipe_Ingredient{.WATER, 2});
+    tower.costs[1].append(Recipe_Ingredient{.FUEL_CELL, 3});
+    tower.costs[1].append(Recipe_Ingredient{.NEXUS_CRYSTAL, 2});
+    tower.costs[2].append(Recipe_Ingredient{.VOLATILE_SHARD, 2});
+    tower.costs[2].append(Recipe_Ingredient{.FACTION_TECH, 3});
+    all_structure_defs.append(tower);
 
     // Workshop - reduces crafting cost or unlocks recipes
     workshop := new(Structure_Def);
@@ -67,13 +67,13 @@ register_structure_defs :: proc() {
     workshop.levels[0] = Structure_Level_Data{40, 1};
     workshop.levels[1] = Structure_Level_Data{80, 2};
     workshop.levels[2] = Structure_Level_Data{120, 3};
-    workshop.costs[0]->append(Recipe_Ingredient{.SCRAP_METAL, 5});
-    workshop.costs[0]->append(Recipe_Ingredient{.FOOD, 3});
-    workshop.costs[1]->append(Recipe_Ingredient{.ALLOY_COMPONENT, 4});
-    workshop.costs[1]->append(Recipe_Ingredient{.FUEL_CELL, 3});
-    workshop.costs[2]->append(Recipe_Ingredient{.FACTION_TECH, 4});
-    workshop.costs[2]->append(Recipe_Ingredient{.RARE_BIOLOGIC, 2});
-    all_structure_defs->append(workshop);
+    workshop.costs[0].append(Recipe_Ingredient{.SCRAP_METAL, 5});
+    workshop.costs[0].append(Recipe_Ingredient{.FOOD, 3});
+    workshop.costs[1].append(Recipe_Ingredient{.ALLOY_COMPONENT, 4});
+    workshop.costs[1].append(Recipe_Ingredient{.FUEL_CELL, 3});
+    workshop.costs[2].append(Recipe_Ingredient{.FACTION_TECH, 4});
+    workshop.costs[2].append(Recipe_Ingredient{.RARE_BIOLOGIC, 2});
+    all_structure_defs.append(workshop);
 
     // Storage - expands inventory capacity
     storage := new(Structure_Def);
@@ -83,13 +83,13 @@ register_structure_defs :: proc() {
     storage.levels[0] = Structure_Level_Data{35, 5};
     storage.levels[1] = Structure_Level_Data{70, 10};
     storage.levels[2] = Structure_Level_Data{100, 15};
-    storage.costs[0]->append(Recipe_Ingredient{.SALVAGE, 6});
-    storage.costs[0]->append(Recipe_Ingredient{.FOOD, 2});
-    storage.costs[1]->append(Recipe_Ingredient{.SCRAP_METAL, 5});
-    storage.costs[1]->append(Recipe_Ingredient{.NEXUS_CRYSTAL, 3});
-    storage.costs[2]->append(Recipe_Ingredient{.ALLOY_COMPONENT, 4});
-    storage.costs[2]->append(Recipe_Ingredient{.VOLATILE_SHARD, 3});
-    all_structure_defs->append(storage);
+    storage.costs[0].append(Recipe_Ingredient{.SALVAGE, 6});
+    storage.costs[0].append(Recipe_Ingredient{.FOOD, 2});
+    storage.costs[1].append(Recipe_Ingredient{.SCRAP_METAL, 5});
+    storage.costs[1].append(Recipe_Ingredient{.NEXUS_CRYSTAL, 3});
+    storage.costs[2].append(Recipe_Ingredient{.ALLOY_COMPONENT, 4});
+    storage.costs[2].append(Recipe_Ingredient{.VOLATILE_SHARD, 3});
+    all_structure_defs.append(storage);
 }
 
 get_structure_def :: proc(kind: Structure_Kind) -> Structure_Def {
@@ -169,10 +169,10 @@ rebuild_outpost_entities :: proc(player: Player) {
     // Destroy old entities
     for ent: outpost.entities {
         if ent != null {
-            ent->destroy();
+            ent.destroy();
         }
     }
-    outpost.entities->clear();
+    outpost.entities.clear();
 
     // Spawn entities for each structure
     for placed: outpost.data.structures {
@@ -184,10 +184,10 @@ spawn_structure_entity :: proc(outpost: Player_Outpost, placed: Placed_Structure
     ent := Scene.create_entity();
     world_x := outpost.data.center_x + placed.grid_x.(float) * OUTPOST_GRID_SIZE;
     world_y := outpost.data.center_y + placed.grid_y.(float) * OUTPOST_GRID_SIZE;
-    ent->set_local_position({world_x, world_y});
+    ent.set_local_position({world_x, world_y});
 
-    sprite := ent->add_component(Sprite_Renderer);
-    sprite->set_texture(core_globals.white_sprite);
+    sprite := ent.add_component(Sprite_Renderer);
+    sprite.set_texture(core_globals.white_sprite);
     sprite.depth_offset = 0.0;
 
     def := get_structure_def_by_index(placed.kind_index);
@@ -195,10 +195,10 @@ spawn_structure_entity :: proc(outpost: Player_Outpost, placed: Placed_Structure
         color := get_structure_color(def.kind);
         scale_val := 0.8 + placed.level.(float) * 0.3;
         sprite.color = color;
-        ent->set_local_scale({scale_val, scale_val});
+        ent.set_local_scale({scale_val, scale_val});
     }
 
-    outpost.entities->append(ent);
+    outpost.entities.append(ent);
 }
 
 get_structure_def_by_index :: proc(index: int) -> Structure_Def {
@@ -251,9 +251,9 @@ spend_structure_cost :: proc(player: Player, kind: Structure_Kind, level: int) {
         remaining := ing.amount;
         for i: 0..player.default_inventory.capacity-1 {
             if remaining <= 0 break;
-            item := player.default_inventory->get_item(i);
+            item := player.default_inventory.get_item(i);
             if item == null continue;
-            defn := item->get_definition();
+            defn := item.get_definition();
             res_defn := defn.(Resource_Definition);
             if res_defn == null continue;
             if res_defn.resource_type != ing.resource_type continue;
@@ -306,7 +306,7 @@ place_structure :: proc(player: Player, kind: Structure_Kind, gx: int, gy: int) 
     placed.grid_x = gx;
     placed.grid_y = gy;
 
-    player.outpost.data.structures->append(placed);
+    player.outpost.data.structures.append(placed);
     spawn_structure_entity(player.outpost, placed);
     apply_outpost_bonuses(player);
     save_outpost(player);
@@ -347,7 +347,7 @@ remove_structure :: proc(player: Player, index: int) -> bool {
     if index < 0 return false;
     if index >= player.outpost.data.structures.count return false;
 
-    player.outpost.data.structures->unordered_remove_by_index(index);
+    player.outpost.data.structures.unordered_remove_by_index(index);
     rebuild_outpost_entities(player);
     apply_outpost_bonuses(player);
     save_outpost(player);
@@ -392,7 +392,7 @@ draw_outpost_world :: proc(player: Player) {
     defer UI.pop_z();
 
     // Plot boundary circle (faint ring)
-    ring_rect := Rect{center, center}->grow(0.05, OUTPOST_PLOT_RADIUS, 0.05, OUTPOST_PLOT_RADIUS);
+    ring_rect := Rect{center, center}.grow(0.05, OUTPOST_PLOT_RADIUS, 0.05, OUTPOST_PLOT_RADIUS);
     UI.quad(ring_rect, core_globals.white_sprite, {0.3, 0.6, 1.0, 0.08});
 
     // Labels above structures
@@ -412,7 +412,7 @@ draw_outpost_world :: proc(player: Player) {
         wx := player.outpost.data.center_x + placed.grid_x.(float) * OUTPOST_GRID_SIZE;
         wy := player.outpost.data.center_y + placed.grid_y.(float) * OUTPOST_GRID_SIZE;
         label_pos := v2{wx, wy + 1.0};
-        label_rect := Rect{label_pos, label_pos}->grow(0.15, 1.5, 0.0, 1.5);
+        label_rect := Rect{label_pos, label_pos}.grow(0.15, 1.5, 0.0, 1.5);
 
         UI.text(label_rect, ts, "% Lv%", {def.name, placed.level});
     }
