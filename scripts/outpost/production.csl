@@ -15,10 +15,11 @@ update_lumber_chain :: proc(player: Player, dt: float) {
     if player.outpost.production_timer < PROD_TICK_INTERVAL return;
     player.outpost.production_timer -= PROD_TICK_INTERVAL;
 
-    produce_lumber(player);
+    // Haul last tick's stock first so each shelf holds goods for one beat.
     try_haul_lumber_to_sawmill(player);
-    convert_planks(player);
     try_haul_planks_to_warehouse(player);
+    produce_lumber(player);
+    convert_planks(player);
 }
 
 produce_lumber :: proc(player: Player) {
