@@ -1,6 +1,7 @@
 ROLL_DURATION :: 0.4;
 ROLL_SPEED :: 12.0;
 ROLL_COOLDOWN :: 1.5;
+ROLL_EDGE_COST :: 1; // Cypher Speed → Edge. Soft cost. Fail if broke.
 
 Dodge_Roll :: class : Ability_Base {
     on_init :: method() {
@@ -9,13 +10,20 @@ Dodge_Roll :: class : Ability_Base {
     }
 
     can_use :: method() -> bool {
-        return !player.is_dead;
+        if player.is_dead return false;
+        if player.edge < ROLL_EDGE_COST return false;
+        return true;
     }
 
     on_update :: method(params: ref Ability_Update_Params) {
         activation := Ability_Utilities.full_update_targeted_aimed_ability(player, this, ref params);
 
         if activation.activate {
+            // Cypher-honest: no dodge if Edge cannot pay. Do not gate on Game.is_server().
+            if player.edge < ROLL_EDGE_COST {
+                return;
+            }
+            player.edge -= ROLL_EDGE_COST;
             current_cooldown = ROLL_COOLDOWN;
             effect := new(Roll_Effect);
             effect.direction = activation.direction;
