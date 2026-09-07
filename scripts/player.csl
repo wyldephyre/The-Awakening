@@ -117,7 +117,7 @@ Player :: class : Player_Base {
                     draw_ability_button(this, Dodge_Roll, 1);
                 }
 
-                hotbar_options := Inventory_Draw_Options.default();
+                hotbar_options := Inventory_Draw_Options.hotbar_default();
                 hotbar_options.hotbar_item_count = 5;
                 hotbar_options.enable_use_from_hotbar = true;
                 hotbar_options.scroll_item_selection = true;
