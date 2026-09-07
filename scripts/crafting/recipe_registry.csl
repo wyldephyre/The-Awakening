@@ -15,6 +15,8 @@ Resource_Type :: enum {
     RARE_BIOLOGIC;
     UMBRALARI_FRAGMENT;
     PURE_NEXUS_ESSENCE;
+    LUMBER;
+    PLANKS;
 }
 
 Resource_Definition :: class : Item_Definition {
@@ -44,6 +46,10 @@ register_resources :: proc() {
     // Tier 4 - Zone 4+
     register_resource("umbralari_fragment", "Umbralari Fragment", .UMBRALARI_FRAGMENT, 4);
     register_resource("pure_nexus_essence", "Pure Nexus Essence", .PURE_NEXUS_ESSENCE, 4);
+
+    // Corsair Cove Day-1 lumber chain (shelf logistics)
+    register_resource("lumber", "Lumber", .LUMBER, 1);
+    register_resource("planks", "Planks", .PLANKS, 1);
 
     register_recipes();
 }

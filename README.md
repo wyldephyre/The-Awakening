@@ -13,5 +13,14 @@ The tabletop chassis is a hack of Monte Cook Games’ Cypher System. Our setting
 - Types: Scrapper, Builder, Seeker, Weaver
 - Pools: Muscle, Spark, Edge
 - Systems: outpost, crafting, gathering, combat, quests
+- Day-1 Corsair Cove logistics: cliff shelves + lumber → planks → warehouse (`docs/CORSAIR-PIVOT-SLICE1.md`)
 
 The original PRDs were lost. This README is the recovered stub, not the rulebook.
+
+## Run the lumber-chain demo
+
+1. Open `ao.project` in All Out (project **The Awakening**, id `69abc6e36a2374002d7404f1`).
+2. Play as host / local.
+3. Create a character.
+4. Walk east of spawn onto the three cliff shelves. Goods move Canopy → Midcliff → Docks.
+5. HUD **Cove** shows stock. **Seed Demo** rebuilds the triangle if needed.

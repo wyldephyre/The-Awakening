@@ -2,14 +2,30 @@ OUTPOST_GRID_SIZE :: 2.0;
 OUTPOST_PLOT_RADIUS :: 8.0;
 MAX_STRUCTURES :: 12;
 
+// Cliff shelves are first-class build pads (Corsair Cove loop).
+// grid_x = slot along the shelf. shelf = terrace height (0 docks .. 2 canopy).
+SHELF_COUNT :: 3;
+SHELF_SLOTS :: 3;
+SHELF_HEIGHT :: 3.5;
+COVE_CENTER_X :: 10.0;
+COVE_CENTER_Y :: 0.0;
+
+WOODCUTTER_LUMBER_CAP :: 8;
+SAWMILL_LUMBER_CAP :: 4;
+SAWMILL_PLANK_CAP :: 4;
+WAREHOUSE_GOODS_CAP :: 24;
+
 Structure_Kind :: enum {
     WALL;
     WATCHTOWER;
     WORKSHOP;
     STORAGE;
+    WOODCUTTER;
+    SAWMILL;
+    WAREHOUSE;
 }
 
-STRUCTURE_COUNT :: 4;
+STRUCTURE_COUNT :: 7;
 
 Structure_Level_Data :: struct {
     hp: int;
@@ -90,6 +106,34 @@ register_structure_defs :: proc() {
     storage.costs[2]->append(Recipe_Ingredient{.ALLOY_COMPONENT, 4});
     storage.costs[2]->append(Recipe_Ingredient{.VOLATILE_SHARD, 3});
     all_structure_defs->append(storage);
+
+    // Woodcutter - canopy producer (implicit grove on its shelf)
+    woodcutter := new(Structure_Def);
+    woodcutter.kind = .WOODCUTTER;
+    woodcutter.name = "Woodcutter";
+    woodcutter.max_level = 1;
+    woodcutter.levels[0] = Structure_Level_Data{40, 0};
+    woodcutter.costs[0]->append(Recipe_Ingredient{.SALVAGE, 4});
+    all_structure_defs->append(woodcutter);
+
+    // Sawmill - converts lumber -> planks
+    sawmill := new(Structure_Def);
+    sawmill.kind = .SAWMILL;
+    sawmill.name = "Sawmill";
+    sawmill.max_level = 1;
+    sawmill.levels[0] = Structure_Level_Data{45, 0};
+    sawmill.costs[0]->append(Recipe_Ingredient{.SALVAGE, 3});
+    sawmill.costs[0]->append(Recipe_Ingredient{.SCRAP_METAL, 2});
+    all_structure_defs->append(sawmill);
+
+    // Warehouse - chain store (not STORAGE inventory bonus)
+    warehouse := new(Structure_Def);
+    warehouse.kind = .WAREHOUSE;
+    warehouse.name = "Warehouse";
+    warehouse.max_level = 1;
+    warehouse.levels[0] = Structure_Level_Data{50, 0};
+    warehouse.costs[0]->append(Recipe_Ingredient{.SALVAGE, 5});
+    all_structure_defs->append(warehouse);
 }
 
 get_structure_def :: proc(kind: Structure_Kind) -> Structure_Def {
@@ -108,7 +152,10 @@ Placed_Structure :: class {
     level: int @ao_serialize;
     grid_x: int @ao_serialize;
     grid_y: int @ao_serialize;
+    shelf: int @ao_serialize;
     hp: int @ao_serialize;
+    stock_lumber: int @ao_serialize;
+    stock_planks: int @ao_serialize;
 }
 
 Outpost_Data :: class {
@@ -116,9 +163,20 @@ Outpost_Data :: class {
     center_x: float @ao_serialize;
     center_y: float @ao_serialize;
     structures: [..]Placed_Structure @ao_serialize;
+    demo_seeded: bool @ao_serialize;
 }
 
-OUTPOST_SAVE_VERSION :: 1;
+OUTPOST_SAVE_VERSION :: 2;
+
+Haul_Job :: class {
+    good: int;
+    t: float;
+    from_x: float;
+    from_y: float;
+    to_x: float;
+    to_y: float;
+    dest_kind_index: int;
+}
 
 // ---------------------------------------------------------------------------
 // Per-player outpost runtime state
@@ -128,6 +186,8 @@ Player_Outpost :: class {
     data: Outpost_Data;
     entities: [..]Entity;
     initialized: bool;
+    production_timer: float;
+    hauls: [..]Haul_Job;
 }
 
 init_player_outpost :: proc(player: Player) {
@@ -140,17 +200,20 @@ init_player_outpost :: proc(player: Player) {
     if !Save.try_get_json(player, "outpost_data", ref outpost.data) {
         outpost.data = new(Outpost_Data);
         outpost.data.version = OUTPOST_SAVE_VERSION;
-        // Place outpost near player spawn offset by player id hash
-        rng: u64 = rng_seed(player.entity.id);
-        angle := rng_range_float(ref rng, 0, 6.28);
-        dist := rng_range_float(ref rng, 8, 15);
-        outpost.data.center_x = cos(angle) * dist;
-        outpost.data.center_y = sin(angle) * dist;
+        // Day-1 cove sits east of spawn so the shelf chain is findable.
+        outpost.data.center_x = COVE_CENTER_X;
+        outpost.data.center_y = COVE_CENTER_Y;
     }
 
     rebuild_outpost_entities(player);
     apply_outpost_bonuses(player);
     outpost.initialized = true;
+
+    if !outpost.data.demo_seeded {
+        if outpost.data.structures.count == 0 {
+            seed_lumber_demo(player);
+        }
+    }
 }
 
 save_outpost :: proc(player: Player) {
@@ -180,11 +243,16 @@ rebuild_outpost_entities :: proc(player: Player) {
     }
 }
 
+structure_world_pos :: proc(outpost: Player_Outpost, placed: Placed_Structure) -> v2 {
+    world_x := outpost.data.center_x + placed.grid_x.(float) * OUTPOST_GRID_SIZE;
+    world_y := outpost.data.center_y + placed.shelf.(float) * SHELF_HEIGHT;
+    return {world_x, world_y};
+}
+
 spawn_structure_entity :: proc(outpost: Player_Outpost, placed: Placed_Structure) {
     ent := Scene.create_entity();
-    world_x := outpost.data.center_x + placed.grid_x.(float) * OUTPOST_GRID_SIZE;
-    world_y := outpost.data.center_y + placed.grid_y.(float) * OUTPOST_GRID_SIZE;
-    ent->set_local_position({world_x, world_y});
+    pos := structure_world_pos(outpost, placed);
+    ent->set_local_position(pos);
 
     sprite := ent->add_component(Sprite_Renderer);
     sprite->set_texture(core_globals.white_sprite);
@@ -213,6 +281,9 @@ get_structure_color :: proc(kind: Structure_Kind) -> v4 {
         case .WATCHTOWER: return {0.3, 0.6, 0.9, 1.0};
         case .WORKSHOP:   return {0.9, 0.6, 0.2, 1.0};
         case .STORAGE:    return {0.4, 0.8, 0.4, 1.0};
+        case .WOODCUTTER: return {0.45, 0.28, 0.12, 1.0};
+        case .SAWMILL:    return {0.78, 0.58, 0.28, 1.0};
+        case .WAREHOUSE:  return {0.38, 0.44, 0.40, 1.0};
     }
     return {1, 1, 1, 1};
 }
@@ -223,8 +294,35 @@ get_kind_index :: proc(kind: Structure_Kind) -> int {
         case .WATCHTOWER: return 1;
         case .WORKSHOP:   return 2;
         case .STORAGE:    return 3;
+        case .WOODCUTTER: return 4;
+        case .SAWMILL:    return 5;
+        case .WAREHOUSE:  return 6;
     }
     return 0;
+}
+
+get_shelf_name :: proc(shelf: int) -> string {
+    if shelf == 2 return "Canopy";
+    if shelf == 1 return "Midcliff";
+    return "Docks";
+}
+
+is_production_kind :: proc(kind: Structure_Kind) -> bool {
+    if kind == .WOODCUTTER return true;
+    if kind == .SAWMILL return true;
+    if kind == .WAREHOUSE return true;
+    return false;
+}
+
+find_structure_of_kind :: proc(player: Player, kind: Structure_Kind) -> Placed_Structure {
+    if player.outpost == null return null;
+    want := get_kind_index(kind);
+    for placed: player.outpost.data.structures {
+        if placed.kind_index == want {
+            return placed;
+        }
+    }
+    return null;
 }
 
 // ---------------------------------------------------------------------------
@@ -270,11 +368,11 @@ spend_structure_cost :: proc(player: Player, kind: Structure_Kind, level: int) {
     }
 }
 
-is_grid_occupied :: proc(player: Player, gx: int, gy: int) -> bool {
+is_grid_occupied :: proc(player: Player, gx: int, shelf: int) -> bool {
     if player.outpost == null return false;
     for placed: player.outpost.data.structures {
         if placed.grid_x == gx {
-            if placed.grid_y == gy {
+            if placed.shelf == shelf {
                 return true;
             }
         }
@@ -282,20 +380,26 @@ is_grid_occupied :: proc(player: Player, gx: int, gy: int) -> bool {
     return false;
 }
 
-is_within_plot :: proc(gx: int, gy: int) -> bool {
-    dist := sqrt(gx.(float) * gx.(float) + gy.(float) * gy.(float)) * OUTPOST_GRID_SIZE;
-    return dist <= OUTPOST_PLOT_RADIUS;
+is_valid_shelf_cell :: proc(gx: int, shelf: int) -> bool {
+    if gx < 0 return false;
+    if gx >= SHELF_SLOTS return false;
+    if shelf < 0 return false;
+    if shelf >= SHELF_COUNT return false;
+    return true;
 }
 
-place_structure :: proc(player: Player, kind: Structure_Kind, gx: int, gy: int) -> bool {
-    if player.outpost == null return false;
-    if player.outpost.data.structures.count >= MAX_STRUCTURES return false;
-    if !is_within_plot(gx, gy) return false;
-    if is_grid_occupied(player, gx, gy) return false;
-    if !can_afford_structure(player, kind, 0) return false;
+is_within_plot :: proc(gx: int, gy: int) -> bool {
+    // gy is the shelf index. Cliff pads replace the old circular plot.
+    return is_valid_shelf_cell(gx, gy);
+}
 
-    spend_structure_cost(player, kind, 0);
+bind_placed_cell :: proc(placed: Placed_Structure, gx: int, shelf: int) {
+    placed.grid_x = gx;
+    placed.shelf = shelf;
+    placed.grid_y = shelf;
+}
 
+append_placed_structure :: proc(player: Player, kind: Structure_Kind, gx: int, shelf: int) -> Placed_Structure {
     placed := new(Placed_Structure);
     placed.kind_index = get_kind_index(kind);
     placed.level = 1;
@@ -303,16 +407,69 @@ place_structure :: proc(player: Player, kind: Structure_Kind, gx: int, gy: int) 
     if def != null {
         placed.hp = def.levels[0].hp;
     }
-    placed.grid_x = gx;
-    placed.grid_y = gy;
-
+    bind_placed_cell(placed, gx, shelf);
     player.outpost.data.structures->append(placed);
     spawn_structure_entity(player.outpost, placed);
+    return placed;
+}
+
+place_structure :: proc(player: Player, kind: Structure_Kind, gx: int, gy: int) -> bool {
+    if player.outpost == null return false;
+    if player.outpost.data.structures.count >= MAX_STRUCTURES return false;
+    if !is_valid_shelf_cell(gx, gy) return false;
+    if is_grid_occupied(player, gx, gy) return false;
+    if !can_afford_structure(player, kind, 0) return false;
+
+    spend_structure_cost(player, kind, 0);
+
+    def := get_structure_def(kind);
+    append_placed_structure(player, kind, gx, gy);
     apply_outpost_bonuses(player);
     save_outpost(player);
 
-    Notifier.notify(player, format_string("Built %!", {def.name}));
+    if def != null {
+        Notifier.notify(player, format_string("Built % on %!", {def.name, get_shelf_name(gy)}));
+    }
     on_quest_structure_built(player);
+    return true;
+}
+
+place_structure_free :: proc(player: Player, kind: Structure_Kind, gx: int, shelf: int) -> bool {
+    if player.outpost == null return false;
+    if player.outpost.data.structures.count >= MAX_STRUCTURES return false;
+    if !is_valid_shelf_cell(gx, shelf) return false;
+    if is_grid_occupied(player, gx, shelf) return false;
+
+    append_placed_structure(player, kind, gx, shelf);
+    apply_outpost_bonuses(player);
+    return true;
+}
+
+seed_lumber_demo :: proc(player: Player) -> bool {
+    if player.outpost == null return false;
+
+    if find_structure_of_kind(player, .WOODCUTTER) == null {
+        place_structure_free(player, .WOODCUTTER, 1, 2);
+    }
+    if find_structure_of_kind(player, .SAWMILL) == null {
+        place_structure_free(player, .SAWMILL, 1, 1);
+    }
+    if find_structure_of_kind(player, .WAREHOUSE) == null {
+        place_structure_free(player, .WAREHOUSE, 1, 0);
+    }
+
+    player.outpost.data.demo_seeded = true;
+    player.outpost.hauls->clear();
+    save_outpost(player);
+
+    cutter := find_structure_of_kind(player, .WOODCUTTER);
+    mill := find_structure_of_kind(player, .SAWMILL);
+    warehouse := find_structure_of_kind(player, .WAREHOUSE);
+    if cutter == null return false;
+    if mill == null return false;
+    if warehouse == null return false;
+
+    Notifier.notify(player, "Cove demo: lumber drops Canopy -> Midcliff -> Docks.");
     return true;
 }
 
@@ -348,6 +505,7 @@ remove_structure :: proc(player: Player, index: int) -> bool {
     if index >= player.outpost.data.structures.count return false;
 
     player.outpost.data.structures->unordered_remove_by_index(index);
+    player.outpost.hauls->clear();
     rebuild_outpost_entities(player);
     apply_outpost_bonuses(player);
     save_outpost(player);
@@ -391,9 +549,7 @@ draw_outpost_world :: proc(player: Player) {
     UI.push_z(center.y - 0.5);
     defer UI.pop_z();
 
-    // Plot boundary circle (faint ring)
-    ring_rect := Rect{center, center}->grow(0.05, OUTPOST_PLOT_RADIUS, 0.05, OUTPOST_PLOT_RADIUS);
-    UI.quad(ring_rect, core_globals.white_sprite, {0.3, 0.6, 1.0, 0.08});
+    draw_cove_shelves(player.outpost);
 
     // Labels above structures
     ts := UI.default_text_settings();
@@ -409,11 +565,73 @@ draw_outpost_world :: proc(player: Player) {
         def := get_structure_def_by_index(placed.kind_index);
         if def == null continue;
 
-        wx := player.outpost.data.center_x + placed.grid_x.(float) * OUTPOST_GRID_SIZE;
-        wy := player.outpost.data.center_y + placed.grid_y.(float) * OUTPOST_GRID_SIZE;
-        label_pos := v2{wx, wy + 1.0};
-        label_rect := Rect{label_pos, label_pos}->grow(0.15, 1.5, 0.0, 1.5);
+        pos := structure_world_pos(player.outpost, placed);
+        label_pos := v2{pos.x, pos.y + 1.0};
+        label_rect := Rect{label_pos, label_pos}->grow(0.15, 1.6, 0.0, 1.6);
 
-        UI.text(label_rect, ts, "% Lv%", {def.name, placed.level});
+        if is_production_kind(def.kind) {
+            UI.text(label_rect, ts, "%  L:% P:%", {def.name, placed.stock_lumber, placed.stock_planks});
+        } else {
+            UI.text(label_rect, ts, "% Lv%  %", {def.name, placed.level, get_shelf_name(placed.shelf)});
+        }
     }
+}
+
+draw_cove_shelves :: proc(outpost: Player_Outpost) {
+    if outpost == null return;
+
+    ts := UI.default_text_settings();
+    ts.size = 0.28;
+    ts.color = {0.95, 0.88, 0.72, 0.85};
+    ts.halign = .LEFT;
+    ts.valign = .CENTER;
+    ts.do_outline = true;
+    ts.outline_thickness = 1;
+    ts.outline_color = {0, 0, 0, 0.55};
+
+    for s: 0..SHELF_COUNT-1 {
+        y := outpost.data.center_y + s.(float) * SHELF_HEIGHT;
+        left_x := outpost.data.center_x - OUTPOST_GRID_SIZE * 0.5;
+        right_x := outpost.data.center_x + (SHELF_SLOTS.(float) - 0.5) * OUTPOST_GRID_SIZE;
+        mid_x := (left_x + right_x) * 0.5;
+
+        pad := Rect{{left_x, y - 0.35}, {right_x, y + 0.15}};
+        color := v4{0.28, 0.30, 0.38, 0.28};
+        if s == 1 {
+            color = {0.42, 0.32, 0.22, 0.32};
+        }
+        if s == 2 {
+            color = {0.22, 0.38, 0.18, 0.30};
+        }
+        UI.quad(pad, core_globals.white_sprite, color);
+
+        face := Rect{{left_x, y - 0.85}, {right_x, y - 0.35}};
+        face_color := color;
+        face_color.w = 0.18;
+        UI.quad(face, core_globals.white_sprite, face_color);
+
+        name_pos := v2{left_x - 0.15, y};
+        name_rect := Rect{name_pos, name_pos}->grow(0.2, 0.1, 0.2, 1.6);
+        UI.text(name_rect, ts, get_shelf_name(s));
+
+        // Implicit canopy stand — not a second gathering system.
+        if s == 2 {
+            draw_canopy_grove(outpost, y);
+        }
+    }
+}
+
+draw_canopy_grove :: proc(outpost: Player_Outpost, shelf_y: float) {
+    trunk := v4{0.32, 0.20, 0.10, 0.85};
+    leaf := v4{0.20, 0.48, 0.22, 0.75};
+    x0 := outpost.data.center_x;
+    x2 := outpost.data.center_x + 2.0 * OUTPOST_GRID_SIZE;
+
+    t0 := v2{x0, shelf_y + 0.35};
+    UI.quad(Rect{t0, t0}->grow(0.35, 0.08, 0.05, 0.08), core_globals.white_sprite, trunk);
+    UI.quad(Rect{t0 + v2{0, 0.45}, t0 + v2{0, 0.45}}->grow(0.22, 0.22, 0.22, 0.22), core_globals.white_sprite, leaf);
+
+    t2 := v2{x2, shelf_y + 0.35};
+    UI.quad(Rect{t2, t2}->grow(0.35, 0.08, 0.05, 0.08), core_globals.white_sprite, trunk);
+    UI.quad(Rect{t2 + v2{0, 0.45}, t2 + v2{0, 0.45}}->grow(0.22, 0.22, 0.22, 0.22), core_globals.white_sprite, leaf);
 }

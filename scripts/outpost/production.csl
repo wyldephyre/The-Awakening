@@ -1,0 +1,254 @@
+PROD_TICK_INTERVAL :: 2.0;
+HAUL_DURATION :: 1.2;
+MAX_HAULS :: 4;
+
+GOOD_LUMBER :: 0;
+GOOD_PLANKS :: 1;
+
+update_lumber_chain :: proc(player: Player, dt: float) {
+    if player.outpost == null return;
+    if !player.outpost.initialized return;
+
+    advance_hauls(player, dt);
+
+    player.outpost.production_timer += dt;
+    if player.outpost.production_timer < PROD_TICK_INTERVAL return;
+    player.outpost.production_timer -= PROD_TICK_INTERVAL;
+
+    produce_lumber(player);
+    try_haul_lumber_to_sawmill(player);
+    convert_planks(player);
+    try_haul_planks_to_warehouse(player);
+}
+
+produce_lumber :: proc(player: Player) {
+    for placed: player.outpost.data.structures {
+        def := get_structure_def_by_index(placed.kind_index);
+        if def == null continue;
+        if def.kind != .WOODCUTTER continue;
+        if placed.stock_lumber >= WOODCUTTER_LUMBER_CAP continue;
+        placed.stock_lumber += 1;
+    }
+}
+
+convert_planks :: proc(player: Player) {
+    for placed: player.outpost.data.structures {
+        def := get_structure_def_by_index(placed.kind_index);
+        if def == null continue;
+        if def.kind != .SAWMILL continue;
+        if placed.stock_lumber <= 0 continue;
+        if placed.stock_planks >= SAWMILL_PLANK_CAP continue;
+        placed.stock_lumber -= 1;
+        placed.stock_planks += 1;
+    }
+}
+
+try_haul_lumber_to_sawmill :: proc(player: Player) {
+    mill := find_structure_with_lumber_space(player, .SAWMILL, SAWMILL_LUMBER_CAP);
+    if mill == null return;
+
+    cutter := find_structure_with_stock(player, .WOODCUTTER, GOOD_LUMBER);
+    if cutter == null return;
+    if !start_haul(player, cutter, mill, GOOD_LUMBER) return;
+    cutter.stock_lumber -= 1;
+}
+
+try_haul_planks_to_warehouse :: proc(player: Player) {
+    warehouse := find_structure_with_plank_space(player, .WAREHOUSE, WAREHOUSE_GOODS_CAP);
+    if warehouse == null return;
+
+    mill := find_structure_with_stock(player, .SAWMILL, GOOD_PLANKS);
+    if mill == null return;
+    if !start_haul(player, mill, warehouse, GOOD_PLANKS) return;
+    mill.stock_planks -= 1;
+}
+
+find_structure_with_stock :: proc(player: Player, kind: Structure_Kind, good: int) -> Placed_Structure {
+    want := get_kind_index(kind);
+    for placed: player.outpost.data.structures {
+        if placed.kind_index != want continue;
+        if good == GOOD_LUMBER {
+            if placed.stock_lumber > 0 return placed;
+        } else {
+            if placed.stock_planks > 0 return placed;
+        }
+    }
+    return null;
+}
+
+find_structure_with_lumber_space :: proc(player: Player, kind: Structure_Kind, cap: int) -> Placed_Structure {
+    want := get_kind_index(kind);
+    inbound := count_hauls_to_kind(player, want, GOOD_LUMBER);
+    for placed: player.outpost.data.structures {
+        if placed.kind_index != want continue;
+        if placed.stock_lumber + inbound < cap return placed;
+    }
+    return null;
+}
+
+find_structure_with_plank_space :: proc(player: Player, kind: Structure_Kind, cap: int) -> Placed_Structure {
+    want := get_kind_index(kind);
+    inbound := count_hauls_to_kind(player, want, GOOD_PLANKS);
+    for placed: player.outpost.data.structures {
+        if placed.kind_index != want continue;
+        if placed.stock_planks + inbound < cap return placed;
+    }
+    return null;
+}
+
+count_hauls_to_kind :: proc(player: Player, kind_index: int, good: int) -> int {
+    total := 0;
+    for haul: player.outpost.hauls {
+        if haul.dest_kind_index == kind_index {
+            if haul.good == good {
+                total += 1;
+            }
+        }
+    }
+    return total;
+}
+
+start_haul :: proc(player: Player, from: Placed_Structure, to: Placed_Structure, good: int) -> bool {
+    if player.outpost.hauls.count >= MAX_HAULS return false;
+
+    from_pos := structure_world_pos(player.outpost, from);
+    to_pos := structure_world_pos(player.outpost, to);
+
+    haul := new(Haul_Job);
+    haul.good = good;
+    haul.t = 0.0;
+    haul.from_x = from_pos.x;
+    haul.from_y = from_pos.y;
+    haul.to_x = to_pos.x;
+    haul.to_y = to_pos.y;
+    haul.dest_kind_index = to.kind_index;
+    player.outpost.hauls->append(haul);
+    return true;
+}
+
+advance_hauls :: proc(player: Player, dt: float) {
+    if player.outpost.hauls.count <= 0 return;
+
+    i := 0;
+    while i < player.outpost.hauls.count {
+        haul := player.outpost.hauls[i];
+        haul.t += dt / HAUL_DURATION;
+        if haul.t >= 1.0 {
+            deliver_haul(player, haul);
+            player.outpost.hauls->unordered_remove_by_index(i);
+        } else {
+            i += 1;
+        }
+    }
+}
+
+deliver_haul :: proc(player: Player, haul: Haul_Job) {
+    dest := find_structure_by_kind_index(player, haul.dest_kind_index);
+    if dest == null return;
+
+    if haul.good == GOOD_LUMBER {
+        dest.stock_lumber += 1;
+    } else {
+        dest.stock_planks += 1;
+    }
+}
+
+find_structure_by_kind_index :: proc(player: Player, kind_index: int) -> Placed_Structure {
+    for placed: player.outpost.data.structures {
+        if placed.kind_index == kind_index {
+            return placed;
+        }
+    }
+    return null;
+}
+
+draw_lumber_hauls :: proc(player: Player) {
+    if player.outpost == null return;
+    if player.outpost.hauls.count <= 0 return;
+
+    UI.push_world_draw_context();
+    defer UI.pop_draw_context();
+
+    for haul: player.outpost.hauls {
+        t := haul.t;
+        if t < 0 { t = 0; }
+        if t > 1 { t = 1; }
+        x := haul.from_x + (haul.to_x - haul.from_x) * t;
+        y := haul.from_y + (haul.to_y - haul.from_y) * t;
+
+        UI.push_z(y + 0.2);
+        pos := v2{x, y + 0.35};
+        rect := Rect{pos, pos}->grow(0.12, 0.12, 0.12, 0.12);
+        color := v4{0.55, 0.32, 0.12, 0.95};
+        if haul.good == GOOD_PLANKS {
+            color = {0.88, 0.74, 0.42, 0.95};
+        }
+        UI.quad(rect, core_globals.white_sprite, color);
+        UI.pop_z();
+    }
+}
+
+count_chain_stock :: proc(player: Player, kind: Structure_Kind, good: int) -> int {
+    if player.outpost == null return 0;
+    want := get_kind_index(kind);
+    total := 0;
+    for placed: player.outpost.data.structures {
+        if placed.kind_index != want continue;
+        if good == GOOD_LUMBER {
+            total += placed.stock_lumber;
+        } else {
+            total += placed.stock_planks;
+        }
+    }
+    return total;
+}
+
+count_hauls_of_good :: proc(player: Player, good: int) -> int {
+    if player.outpost == null return 0;
+    total := 0;
+    for haul: player.outpost.hauls {
+        if haul.good == good {
+            total += 1;
+        }
+    }
+    return total;
+}
+
+give_resource_to_player :: proc(player: Player, res_type: Resource_Type, amount: int) -> bool {
+    defn := get_resource_definition(res_type);
+    if defn == null return false;
+
+    item := Items.create_item_instance(defn, amount.(s64));
+    will_destroy: bool;
+    if !Items.can_move_item_to_inventory(item, player.default_inventory, ref will_destroy) {
+        Items.destroy_item_instance(item);
+        return false;
+    }
+    Items.move_item_to_inventory(item, player.default_inventory);
+    return true;
+}
+
+withdraw_warehouse :: proc(player: Player, res_type: Resource_Type) -> bool {
+    warehouse := find_structure_of_kind(player, .WAREHOUSE);
+    if warehouse == null return false;
+
+    if res_type == .LUMBER {
+        if warehouse.stock_lumber <= 0 return false;
+        if !give_resource_to_player(player, .LUMBER, 1) return false;
+        warehouse.stock_lumber -= 1;
+        save_outpost(player);
+        Notifier.notify(player, "Took 1 Lumber from the warehouse.");
+        return true;
+    }
+
+    if res_type == .PLANKS {
+        if warehouse.stock_planks <= 0 return false;
+        if !give_resource_to_player(player, .PLANKS, 1) return false;
+        warehouse.stock_planks -= 1;
+        save_outpost(player);
+        Notifier.notify(player, "Took 1 Plank from the warehouse.");
+        return true;
+    }
+
+    return false;
+}
