@@ -3,6 +3,7 @@ SLASH_DAMAGE :: 10;
 SLASH_DURATION :: 0.3;
 SLASH_LUNGE_SPEED :: 8.0;
 SLASH_COOLDOWN :: 0.5;
+SLASH_MUSCLE_COST :: 1; // Cypher Might → Muscle. Soft cost. Fail if broke.
 
 Melee_Attack :: class : Ability_Base {
     on_init :: method() {
@@ -12,13 +13,20 @@ Melee_Attack :: class : Ability_Base {
     }
 
     can_use :: method() -> bool {
-        return !player.is_dead;
+        if player.is_dead return false;
+        if player.muscle < SLASH_MUSCLE_COST return false;
+        return true;
     }
 
     on_update :: method(params: ref Ability_Update_Params) {
         activation := Ability_Utilities.full_update_aimed_ability(player, ref params);
 
         if activation.activate {
+            // Cypher-honest: no slash if Muscle cannot pay. Do not gate on Game.is_server().
+            if player.muscle < SLASH_MUSCLE_COST {
+                return;
+            }
+            player.muscle -= SLASH_MUSCLE_COST;
             current_cooldown = SLASH_COOLDOWN;
             effect := new(Slash_Effect);
             effect.direction = activation.direction;
