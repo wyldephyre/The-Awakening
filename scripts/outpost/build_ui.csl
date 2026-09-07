@@ -32,6 +32,8 @@ draw_build_mode :: proc(player: Player) {
     count := player.outpost.data.structures.count;
     UI.text(count_rect, ts, "Structures: %/%", {count, MAX_STRUCTURES});
 
+    panel.cut_top(6);
+    draw_shelf_picker(player, panel.cut_top(36));
     panel.cut_top(8);
 
     // Structure buttons
@@ -137,6 +139,39 @@ draw_structure_button :: proc(player: Player, rect: Rect, def: Structure_Def, in
     }
 }
 
+draw_shelf_picker :: proc(player: Player, row: Rect) {
+    ts := UI.default_text_settings();
+    ts.size = 18;
+    ts.color = {0.8, 0.8, 0.8, 1};
+    ts.halign = .CENTER;
+    ts.valign = .CENTER;
+
+    label := row.cut_left(52);
+    UI.text(label, ts, "Shelf");
+
+    bs := UI.default_button_settings();
+    bs.press_scaling = 0.35;
+    btn_ts := UI.default_text_settings();
+    btn_ts.size = 16;
+    btn_ts.color = {1, 1, 1, 1};
+
+    for s: 0..SHELF_COUNT-1 {
+        UI.push_id("shelf_%", {s});
+        defer UI.pop_id();
+
+        btn := row.cut_left(58);
+        row.cut_left(4);
+        if player.build_shelf == s {
+            bs.sprite = get_asset(Texture_Asset, "$AO/new/modal/buttons_2/button_5.png");
+        } else {
+            bs.sprite = get_asset(Texture_Asset, "$AO/new/modal/buttons_2/button_9.png");
+        }
+        if UI.button(btn, bs, btn_ts, get_shelf_name(s)).clicked {
+            player.build_shelf = s;
+        }
+    }
+}
+
 draw_build_ghost :: proc(player: Player) {
     if player.outpost == null return;
 
@@ -145,12 +180,12 @@ draw_build_ghost :: proc(player: Player) {
     rel := mouse_world - center;
 
     gx := (rel.x / OUTPOST_GRID_SIZE + 0.5).(int);
-    gy := (rel.y / OUTPOST_GRID_SIZE + 0.5).(int);
+    gy := player.build_shelf;
 
     snap_x := center.x + gx.(float) * OUTPOST_GRID_SIZE;
-    snap_y := center.y + gy.(float) * OUTPOST_GRID_SIZE;
+    snap_y := center.y + gy.(float) * SHELF_HEIGHT;
 
-    valid := is_within_plot(gx, gy) && !is_grid_occupied(player, gx, gy);
+    valid := is_valid_shelf_cell(gx, gy) && !is_grid_occupied(player, gx, gy);
 
     UI.push_world_draw_context();
     defer UI.pop_draw_context();
@@ -177,7 +212,7 @@ handle_build_placement :: proc(player: Player) {
     rel := mouse_world - center;
 
     gx := (rel.x / OUTPOST_GRID_SIZE + 0.5).(int);
-    gy := (rel.y / OUTPOST_GRID_SIZE + 0.5).(int);
+    gy := player.build_shelf;
 
     // Check for tap in world area (not on UI panel)
     mouse_screen := get_mouse_screen_position();
@@ -286,13 +321,17 @@ draw_structure_list_row :: proc(player: Player, row: Rect, placed: Placed_Struct
     ts.outline_color = {0, 0, 0, 1};
 
     name_rect := content.cut_top(26);
-    UI.text(name_rect, ts, "% Lv%", {def.name, placed.level});
+    UI.text(name_rect, ts, "%  %", {def.name, get_shelf_name(placed.shelf)});
 
-    // HP
+    // HP or stock
     ts.size = 20;
     ts.color = {0.7, 0.7, 0.7, 1};
-    lvl_idx := placed.level - 1;
-    if lvl_idx < 0 { lvl_idx = 0; }
-    max_hp := def.levels[lvl_idx].hp;
-    UI.text(content, ts, "HP: %/%", {placed.hp, max_hp});
+    if is_production_kind(def.kind) {
+        UI.text(content, ts, "L:%  P:%", {placed.stock_lumber, placed.stock_planks});
+    } else {
+        lvl_idx := placed.level - 1;
+        if lvl_idx < 0 { lvl_idx = 0; }
+        max_hp := def.levels[lvl_idx].hp;
+        UI.text(content, ts, "HP: %/%", {placed.hp, max_hp});
+    }
 }

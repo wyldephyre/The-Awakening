@@ -30,6 +30,8 @@ Player :: class : Player_Base {
     crafting_open: bool;
     build_mode: bool;
     build_selected: int;
+    build_shelf: int;
+    cove_open: bool;
     gear_open: bool;
     quest_log_open: bool;
 
@@ -71,6 +73,8 @@ Player :: class : Player_Base {
         }
 
         build_selected = -1;
+        build_shelf = 0;
+        cove_open = false;
 
         if character_created {
             init_player_outpost(this);
@@ -102,6 +106,8 @@ Player :: class : Player_Base {
                     invulnerable_timer = 0;
                 }
             }
+
+            update_lumber_chain(this, dt);
         }
     }
 
@@ -141,10 +147,15 @@ Player :: class : Player_Base {
                     draw_quest_log(this);
                 }
 
+                if cove_open {
+                    draw_cove_panel(this);
+                }
+
                 draw_quest_tracker(this);
                 update_quest_zone(this);
 
                 draw_outpost_world(this);
+                draw_lumber_hauls(this);
             }
         }
     }
