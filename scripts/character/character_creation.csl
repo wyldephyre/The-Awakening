@@ -248,4 +248,8 @@ complete_character_creation :: proc(player: Player) {
     init_player_outpost(player);
     init_player_equipment(player);
     init_player_quests(player);
+
+    // Lake tutorial comes next. Cove stays locked (`cove_unlocked` defaults false).
+    // Snyder arrival (later slice) should call unlock_cove(player).
+    // DEBUG CHEAT only: editor HUD "Unlock Cove (debug)". Do not call it here.
 }

@@ -107,7 +107,7 @@ draw_hud :: proc(player: Player) {
         player.cove_open = false;
     }
 
-    // Cove logistics — Day-1 lumber chain readout
+    // Cove HUD is locked at lake cold-open. Snyder arrival calls unlock_cove.
     cove_rect := safe.top_right_rect().grow(0, 0, 37, 105).offset(-20, -295);
     cove_bs := UI.default_button_settings();
     cove_bs.press_scaling = 0.35;
@@ -115,17 +115,27 @@ draw_hud :: proc(player: Player) {
     cove_ts.size = 30;
     cove_ts.color = {1, 1, 1, 1};
 
-    if player.cove_open {
-        cove_bs.sprite = get_asset(Texture_Asset, "$AO/new/modal/buttons_2/button_5.png");
-    } else {
-        cove_bs.sprite = get_asset(Texture_Asset, "$AO/new/modal/buttons_2/button_9.png");
-    }
-    if UI.button(cove_rect, cove_bs, cove_ts, "Cove").clicked {
-        player.cove_open = !player.cove_open;
-        player.crafting_open = false;
-        player.build_mode = false;
-        player.gear_open = false;
-        player.quest_log_open = false;
+    if player.cove_unlocked {
+        if player.cove_open {
+            cove_bs.sprite = get_asset(Texture_Asset, "$AO/new/modal/buttons_2/button_5.png");
+        } else {
+            cove_bs.sprite = get_asset(Texture_Asset, "$AO/new/modal/buttons_2/button_9.png");
+        }
+        if UI.button(cove_rect, cove_bs, cove_ts, "Cove").clicked {
+            player.cove_open = !player.cove_open;
+            player.crafting_open = false;
+            player.build_mode = false;
+            player.gear_open = false;
+            player.quest_log_open = false;
+        }
+    } else if Game.is_launched_from_editor() {
+        // DEBUG CHEAT only — not the Snyder arrival setter.
+        cove_bs.sprite = get_asset(Texture_Asset, "$AO/new/modal/buttons_2/button_8.png");
+        cove_ts.size = 18;
+        if UI.button(cove_rect, cove_bs, cove_ts, "Unlock Cove (debug)").clicked {
+            unlock_cove(player);
+            Notifier.notify(player, "DEBUG: Cove unlocked. Walk east of you.");
+        }
     }
 }
 

@@ -7,8 +7,8 @@ MAX_STRUCTURES :: 12;
 SHELF_COUNT :: 3;
 SHELF_SLOTS :: 3;
 SHELF_HEIGHT :: 3.5;
-COVE_CENTER_X :: 10.0;
-COVE_CENTER_Y :: 0.0;
+// East of THAT player's position at first seed — not a shared world (10, 0).
+COVE_EAST_OFFSET :: 10.0;
 
 WOODCUTTER_LUMBER_CAP :: 8;
 SAWMILL_LUMBER_CAP :: 4;
@@ -170,7 +170,7 @@ OUTPOST_SAVE_VERSION :: 2;
 
 Haul_Job :: class {
     good: int;
-    t: float;
+    start_time: float;
     from_x: float;
     from_y: float;
     to_x: float;
@@ -186,7 +186,7 @@ Player_Outpost :: class {
     data: Outpost_Data;
     entities: [..]Entity;
     initialized: bool;
-    production_timer: float;
+    next_prod_time: float;
     hauls: [..]Haul_Job;
 }
 
@@ -200,17 +200,45 @@ init_player_outpost :: proc(player: Player) {
     if !Save.try_get_json(player, "outpost_data", ref outpost.data) {
         outpost.data = new(Outpost_Data);
         outpost.data.version = OUTPOST_SAVE_VERSION;
-        // Day-1 cove sits east of spawn so the shelf chain is findable.
-        outpost.data.center_x = COVE_CENTER_X;
-        outpost.data.center_y = COVE_CENTER_Y;
+        // World offset is applied at first seed / unlock_cove so it is east of
+        // THIS player (Snyder arrival), not a shared lake-origin (10, 0).
     }
 
     rebuild_outpost_entities(player);
     apply_outpost_bonuses(player);
     outpost.initialized = true;
 
-    if !outpost.data.demo_seeded {
-        if outpost.data.structures.count == 0 {
+    // Lake tutorial comes next. Cove auto-seed waits for Snyder arrival.
+    if player.cove_unlocked {
+        if !outpost.data.demo_seeded {
+            if outpost.data.structures.count == 0 {
+                seed_lumber_demo(player);
+            }
+        }
+    }
+}
+
+place_cove_east_of_player :: proc(player: Player) {
+    if player.outpost == null return;
+    origin := player.entity.world_position;
+    player.outpost.data.center_x = origin.x + COVE_EAST_OFFSET;
+    player.outpost.data.center_y = origin.y;
+}
+
+// Snyder arrival (next slice) should call this. Do not call from lake cold-open.
+// DEBUG CHEAT: editor HUD button "Unlock Cove (debug)" also calls this.
+unlock_cove :: proc(player: Player) {
+    if player.cove_unlocked return;
+    player.cove_unlocked = true;
+    save_player_data(player);
+
+    if player.outpost == null {
+        init_player_outpost(player);
+        return;
+    }
+
+    if !player.outpost.data.demo_seeded {
+        if player.outpost.data.structures.count == 0 {
             seed_lumber_demo(player);
         }
     }
@@ -448,6 +476,12 @@ place_structure_free :: proc(player: Player, kind: Structure_Kind, gx: int, shel
 seed_lumber_demo :: proc(player: Player) -> bool {
     if player.outpost == null return false;
 
+    // First seed parks the triangle east of THIS player's current position.
+    if !player.outpost.data.demo_seeded {
+        place_cove_east_of_player(player);
+        rebuild_outpost_entities(player);
+    }
+
     if find_structure_of_kind(player, .WOODCUTTER) == null {
         place_structure_free(player, .WOODCUTTER, 1, 2);
     }
@@ -549,7 +583,9 @@ draw_outpost_world :: proc(player: Player) {
     UI.push_z(center.y - 0.5);
     defer UI.pop_z();
 
-    draw_cove_shelves(player.outpost);
+    if player.cove_unlocked {
+        draw_cove_shelves(player.outpost);
+    }
 
     // Labels above structures
     ts := UI.default_text_settings();

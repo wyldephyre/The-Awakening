@@ -32,6 +32,7 @@ Player :: class : Player_Base {
     build_selected: int;
     build_shelf: int;
     cove_open: bool;
+    cove_unlocked: bool;
     gear_open: bool;
     quest_log_open: bool;
 
@@ -80,6 +81,9 @@ Player :: class : Player_Base {
             init_player_outpost(this);
             init_player_equipment(this);
             init_player_quests(this);
+            // Snyder arrival (next slice) calls unlock_cove(this).
+            // DEBUG CHEAT: uncomment the next line to force-unlock Cove on join.
+            // unlock_cove(this);
         }
     }
 
@@ -106,9 +110,10 @@ Player :: class : Player_Base {
                     invulnerable_timer = 0;
                 }
             }
-
-            update_lumber_chain(this, dt);
         }
+
+        // All Out: never gate gameplay on Game.is_server(). Timestamps live on the chain.
+        update_lumber_chain(this);
     }
 
     ao_late_update :: method(dt: float) {
@@ -147,15 +152,19 @@ Player :: class : Player_Base {
                     draw_quest_log(this);
                 }
 
-                if cove_open {
-                    draw_cove_panel(this);
+                if cove_unlocked {
+                    if cove_open {
+                        draw_cove_panel(this);
+                    }
                 }
 
                 draw_quest_tracker(this);
                 update_quest_zone(this);
 
                 draw_outpost_world(this);
-                draw_lumber_hauls(this);
+                if cove_unlocked {
+                    draw_lumber_hauls(this);
+                }
             }
         }
     }
@@ -215,6 +224,9 @@ load_player_data :: proc(player: Player) {
     player.muscle = Save.get_int(player, "muscle", player.muscle_max);
     player.spark = Save.get_int(player, "spark", player.spark_max);
     player.edge = Save.get_int(player, "edge", player.edge_max);
+
+    // Cove stays locked at lake cold-open. Snyder arrival (next slice) calls unlock_cove.
+    player.cove_unlocked = Save.get_int(player, "cove_unlocked", 0) != 0;
 }
 
 apply_type_bonuses :: proc(player: Player) {
@@ -257,6 +269,12 @@ save_player_data :: proc(player: Player) {
     Save.set_int(player, "muscle", player.muscle);
     Save.set_int(player, "spark", player.spark);
     Save.set_int(player, "edge", player.edge);
+
+    unlocked_val := 0;
+    if player.cove_unlocked {
+        unlocked_val = 1;
+    }
+    Save.set_int(player, "cove_unlocked", unlocked_val);
 }
 
 player_take_damage :: proc(player: Player, amount: int) {
