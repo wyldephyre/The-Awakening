@@ -28,26 +28,37 @@ Muscle / Spark / Edge and Scrapper / Builder / Seeker / Weaver are untouched.
    - Haul lumber down to Midcliff `Sawmill`.
    - Sawmill converts 1 lumber → 1 plank.
    - Haul planks down to Docks `Warehouse` (cap 24).
-3. **Runnable demo**
-   - New outposts seed the triangle automatically (east of spawn at `10, 0`).
+3. **Runnable demo** (after Cove unlock — see hygiene)
+   - First seed parks the triangle **east of that player** (`world_position + (10, 0)`).
    - HUD **Cove** panel shows shelf stock + in-transit counts.
    - **Seed Demo** re-places any missing chain building.
-   - **Take Lumber / Take Planks** pulls warehouse stock into the existing inventory.
+   - **Take Planks** pulls warehouse planks into inventory. Warehouse never stores lumber.
 4. World draw: terrace pads, canopy trees (visual only), building stock labels, moving haul quads.
 
-## How to run the demo
+## Hygiene pass
+
+Required fixes only. Shelf / woodcutter / sawmill / warehouse systems stayed intact.
+
+- **No `Game.is_server()` on the chain.** `update_lumber_chain` runs from `Player.ao_update` without that gate. Production uses `get_time()` (`next_prod_time`); hauls store `start_time` and lerp from the clock instead of per-frame `dt`.
+- **Per-player cove offset.** First seed calls `place_cove_east_of_player`. Shared world `(10, 0)` is gone.
+- **Take Lumber removed.** By design lumber never sits in the warehouse (canopy → mill only). **Take Planks** remains.
+- **`cove_unlocked` defaults false.** Lake cold-open does **not** auto-seed or show Cove HUD / shelves. Lake tutorial is next. Cove unlocks at **Snyder arrival** via `unlock_cove` (stub). Editor playtest: **Unlock Cove (debug)** on the HUD. Do not wire the setter to lake start.
+
+## How to run the demo (host / local)
 
 1. Open this repo in All Out. Project entry: `ao.project` → **The Awakening** (`69abc6e36a2374002d7404f1`).
-2. Play as **host / local** (production ticks on the server).
-3. Finish character creation (any type).
-4. Walk east of spawn to the three stacked shelves.
-5. Watch brown lumber leave the canopy, convert on midcliff, and tan planks stack in the dock warehouse (~5s to first stored plank).
-6. HUD → **Cove** for the readout. **Seed Demo** if you demolished a building.
+2. Play as **host / local** (or a client — the chain is not server-gated).
+3. Finish character creation (any type). **Lake cold-open:** no Cove button, no auto-seeded shelves.
+4. Editor playtest: click **Unlock Cove (debug)**. That is the cheat stand-in for Snyder arrival.
+5. Walk **east of where you stood when you unlocked** onto the three stacked shelves.
+6. Watch brown lumber leave the canopy, convert on midcliff, and tan planks stack in the dock warehouse (~5s to first stored plank).
+7. HUD → **Cove** for the readout. **Take Planks** / **Seed Demo** if needed.
 
 Manual place: HUD → **Build** → pick shelf (Docks / Midcliff / Canopy) → Woodcutter / Sawmill / Warehouse. Costs use existing salvage / scrap metal so the chain can be rebuilt from the current economy.
 
 ## What is next (not this PR)
 
+- **Lake tutorial** — cold-open stay. Then Snyder arrival calls `unlock_cove`.
 - **Rope / ziplines / ladders** — hauls are currently a straight lerp down the cliff. Next slice should make vertical links first-class and paint green/red path health.
 - **Powder** — second goods chain (fiber / charcoal / powder) on a later shelf. Do not explode the catalog to 50+ goods.
 - **Weave expeditions** — fleet-card slot becomes expedition cards. Forge owns the names. Do not wire cards until that pass.
@@ -55,9 +66,9 @@ Manual place: HUD → **Build** → pick shelf (Docks / Midcliff / Canopy) → W
 
 ## File map
 
-- `scripts/outpost/outpost.csl` — shelves, three building defs, seed
-- `scripts/outpost/production.csl` — tick + hauls + warehouse withdraw
+- `scripts/outpost/outpost.csl` — shelves, three building defs, seed, `unlock_cove`
+- `scripts/outpost/production.csl` — timestamp tick + hauls + plank withdraw
 - `scripts/outpost/cove_ui.csl` — Cove panel
 - `scripts/outpost/build_ui.csl` — shelf picker
 - `scripts/crafting/recipe_registry.csl` — `LUMBER` / `PLANKS`
-- `scripts/player.csl`, `scripts/ui/hud.csl` — tick + Cove button
+- `scripts/player.csl`, `scripts/ui/hud.csl` — ungated tick + gated Cove / debug unlock

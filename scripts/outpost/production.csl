@@ -1,25 +1,43 @@
 PROD_TICK_INTERVAL :: 2.0;
 HAUL_DURATION :: 1.2;
 MAX_HAULS :: 4;
+MAX_PROD_CATCHUP :: 3;
 
 GOOD_LUMBER :: 0;
 GOOD_PLANKS :: 1;
 
-update_lumber_chain :: proc(player: Player, dt: float) {
+update_lumber_chain :: proc(player: Player) {
+    if !player.cove_unlocked return;
     if player.outpost == null return;
     if !player.outpost.initialized return;
 
-    advance_hauls(player, dt);
+    advance_hauls(player);
 
-    player.outpost.production_timer += dt;
-    if player.outpost.production_timer < PROD_TICK_INTERVAL return;
-    player.outpost.production_timer -= PROD_TICK_INTERVAL;
+    now := get_time();
+    if player.outpost.next_prod_time <= 0 {
+        player.outpost.next_prod_time = now + PROD_TICK_INTERVAL;
+        return;
+    }
 
-    // Haul last tick's stock first so each shelf holds goods for one beat.
-    try_haul_lumber_to_sawmill(player);
-    try_haul_planks_to_warehouse(player);
-    produce_lumber(player);
-    convert_planks(player);
+    ticks := 0;
+    while now >= player.outpost.next_prod_time {
+        if ticks >= MAX_PROD_CATCHUP break;
+
+        // Haul last tick's stock first so each shelf holds goods for one beat.
+        try_haul_lumber_to_sawmill(player);
+        try_haul_planks_to_warehouse(player);
+        produce_lumber(player);
+        convert_planks(player);
+
+        player.outpost.next_prod_time += PROD_TICK_INTERVAL;
+        ticks += 1;
+    }
+
+    if ticks >= MAX_PROD_CATCHUP {
+        if player.outpost.next_prod_time < now {
+            player.outpost.next_prod_time = now + PROD_TICK_INTERVAL;
+        }
+    }
 }
 
 produce_lumber :: proc(player: Player) {
@@ -117,7 +135,7 @@ start_haul :: proc(player: Player, from: Placed_Structure, to: Placed_Structure,
 
     haul := new(Haul_Job);
     haul.good = good;
-    haul.t = 0.0;
+    haul.start_time = get_time();
     haul.from_x = from_pos.x;
     haul.from_y = from_pos.y;
     haul.to_x = to_pos.x;
@@ -127,14 +145,20 @@ start_haul :: proc(player: Player, from: Placed_Structure, to: Placed_Structure,
     return true;
 }
 
-advance_hauls :: proc(player: Player, dt: float) {
+haul_progress :: proc(haul: Haul_Job) -> float {
+    t := (get_time() - haul.start_time) / HAUL_DURATION;
+    if t < 0 return 0.0;
+    if t > 1 return 1.0;
+    return t;
+}
+
+advance_hauls :: proc(player: Player) {
     if player.outpost.hauls.count <= 0 return;
 
     i := 0;
     while i < player.outpost.hauls.count {
         haul := player.outpost.hauls[i];
-        haul.t += dt / HAUL_DURATION;
-        if haul.t >= 1.0 {
+        if haul_progress(haul) >= 1.0 {
             deliver_haul(player, haul);
             player.outpost.hauls->unordered_remove_by_index(i);
         } else {
@@ -171,9 +195,7 @@ draw_lumber_hauls :: proc(player: Player) {
     defer UI.pop_draw_context();
 
     for haul: player.outpost.hauls {
-        t := haul.t;
-        if t < 0 { t = 0; }
-        if t > 1 { t = 1; }
+        t := haul_progress(haul);
         x := haul.from_x + (haul.to_x - haul.from_x) * t;
         y := haul.from_y + (haul.to_y - haul.from_y) * t;
 
@@ -229,27 +251,13 @@ give_resource_to_player :: proc(player: Player, res_type: Resource_Type, amount:
     return true;
 }
 
-withdraw_warehouse :: proc(player: Player, res_type: Resource_Type) -> bool {
+withdraw_warehouse_planks :: proc(player: Player) -> bool {
     warehouse := find_structure_of_kind(player, .WAREHOUSE);
     if warehouse == null return false;
-
-    if res_type == .LUMBER {
-        if warehouse.stock_lumber <= 0 return false;
-        if !give_resource_to_player(player, .LUMBER, 1) return false;
-        warehouse.stock_lumber -= 1;
-        save_outpost(player);
-        Notifier.notify(player, "Took 1 Lumber from the warehouse.");
-        return true;
-    }
-
-    if res_type == .PLANKS {
-        if warehouse.stock_planks <= 0 return false;
-        if !give_resource_to_player(player, .PLANKS, 1) return false;
-        warehouse.stock_planks -= 1;
-        save_outpost(player);
-        Notifier.notify(player, "Took 1 Plank from the warehouse.");
-        return true;
-    }
-
-    return false;
+    if warehouse.stock_planks <= 0 return false;
+    if !give_resource_to_player(player, .PLANKS, 1) return false;
+    warehouse.stock_planks -= 1;
+    save_outpost(player);
+    Notifier.notify(player, "Took 1 Plank from the warehouse.");
+    return true;
 }

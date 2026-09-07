@@ -59,19 +59,12 @@ draw_cove_panel :: proc(player: Player) {
         seed_lumber_demo(player);
     }
 
-    btn_row.cut_left(8);
-    take_l := btn_row.cut_left(140);
-    bs.sprite = get_asset(Texture_Asset, "$AO/new/modal/buttons_2/button_1.png");
-    if UI.button(take_l, bs, btn_ts, "Take Lumber").clicked {
-        if !withdraw_warehouse(player, .LUMBER) {
-            Notifier.notify(player, "No warehouse lumber.");
-        }
-    }
-
+    // Warehouse stores planks only. Lumber stays on canopy / mill — no Take Lumber.
     btn_row.cut_left(8);
     take_p := btn_row.cut_left(140);
+    bs.sprite = get_asset(Texture_Asset, "$AO/new/modal/buttons_2/button_1.png");
     if UI.button(take_p, bs, btn_ts, "Take Planks").clicked {
-        if !withdraw_warehouse(player, .PLANKS) {
+        if !withdraw_warehouse_planks(player) {
             Notifier.notify(player, "No warehouse planks yet.");
         }
     }

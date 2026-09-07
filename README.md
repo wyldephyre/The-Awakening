@@ -20,7 +20,7 @@ The original PRDs were lost. This README is the recovered stub, not the rulebook
 ## Run the lumber-chain demo
 
 1. Open `ao.project` in All Out (project **The Awakening**, id `69abc6e36a2374002d7404f1`).
-2. Play as host / local.
-3. Create a character.
-4. Walk east of spawn onto the three cliff shelves. Goods move Canopy → Midcliff → Docks.
-5. HUD **Cove** shows stock. **Seed Demo** rebuilds the triangle if needed.
+2. Play as host / local (or a client — production is not gated on `Game.is_server()`).
+3. Create a character. Lake cold-open has **no** Cove HUD and does **not** auto-seed.
+4. Editor: **Unlock Cove (debug)** (stand-in for Snyder arrival). Walk east of your position.
+5. Goods move Canopy → Midcliff → Docks. HUD **Cove** shows stock. **Take Planks** / **Seed Demo** as needed.
