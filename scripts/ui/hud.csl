@@ -208,11 +208,9 @@ draw_ability_cooldown_strip :: proc(player: Player) {
     if cooling <= 0 return;
 
     safe := UI.get_safe_screen_rect();
-    strip := safe.bottom_rect().grow_top(32).inset(0, 360, 0, 360).offset(0, 168);
+    // Fixed chip row just above Items.draw_hotbar (bottom-center, ~150px tall).
+    strip := safe.bottom_center_rect().grow(16, 180, 16, 180).offset(0, 188);
     slot_w := strip.width() / cooling.(float);
-    if slot_w < 80.0 {
-        slot_w = 80.0;
-    }
 
     ts := UI.default_text_settings();
     ts.size = 20;
