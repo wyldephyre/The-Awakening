@@ -7,9 +7,8 @@ draw_quest_tracker :: proc(player: Player) {
     def := get_quest_def(qi);
     if def == null return;
 
-    safe := UI.get_safe_screen_rect();
-    tracker := safe.left_rect().grow(0, 240, 0, 0).inset(80, 0, 0, 10);
-    tracker = tracker.cut_top(80);
+    // Same left column as HP/Muscle/Spark/Edge, parked below the pools.
+    tracker := hud_quest_tracker_rect();
 
     UI.quad(tracker, core_globals.white_sprite, {0, 0, 0, 0.4});
 

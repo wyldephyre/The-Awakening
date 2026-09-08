@@ -80,25 +80,27 @@ Player :: class : Player_Base {
     }
 
     ao_update :: method(dt: float) {
-        regen_timer += dt;
-        if regen_timer >= POOL_REGEN_INTERVAL {
-            regen_timer -= POOL_REGEN_INTERVAL;
-            if muscle < muscle_max {
-                muscle += 1;
+        if Game.is_server() {
+            regen_timer += dt;
+            if regen_timer >= POOL_REGEN_INTERVAL {
+                regen_timer -= POOL_REGEN_INTERVAL;
+                if muscle < muscle_max {
+                    muscle += 1;
+                }
+                if spark < spark_max {
+                    spark += 1;
+                }
+                if edge < edge_max {
+                    edge += 1;
+                }
             }
-            if spark < spark_max {
-                spark += 1;
-            }
-            if edge < edge_max {
-                edge += 1;
-            }
-        }
 
-        if invulnerable_timer > 0 {
-            invulnerable_timer -= dt;
-            if invulnerable_timer <= 0 {
-                invulnerable = false;
-                invulnerable_timer = 0;
+            if invulnerable_timer > 0 {
+                invulnerable_timer -= dt;
+                if invulnerable_timer <= 0 {
+                    invulnerable = false;
+                    invulnerable_timer = 0;
+                }
             }
         }
     }
@@ -115,7 +117,7 @@ Player :: class : Player_Base {
                     draw_ability_button(this, Dodge_Roll, 1);
                 }
 
-                hotbar_options := Inventory_Draw_Options.default();
+                hotbar_options := Inventory_Draw_Options.hotbar_default();
                 hotbar_options.hotbar_item_count = 5;
                 hotbar_options.enable_use_from_hotbar = true;
                 hotbar_options.scroll_item_selection = true;

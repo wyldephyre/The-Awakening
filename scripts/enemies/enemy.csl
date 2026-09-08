@@ -134,7 +134,7 @@ Enemy :: class : Component {
     }
 }
 
-find_nearest_player :: proc(position: v2) -> Player, bool {
+find_nearest_player :: proc(position: v2) -> (Player, bool) {
     closest: Player;
     closest_dist := 9999.0;
     found := false;

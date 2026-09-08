@@ -1,26 +1,48 @@
 ROLL_DURATION :: 0.4;
 ROLL_SPEED :: 12.0;
 ROLL_COOLDOWN :: 1.5;
+ROLL_EDGE_COST :: 1; // Cypher Speed -> Edge. Soft cost. Fail if broke.
 
 Dodge_Roll :: class : Ability_Base {
     on_init :: method() {
         name = "Dodge";
-        is_aimed_ability = true;
+        // Instant roll. Raw SPACE (not Keybinds.register) — remaps were getting eaten.
+        // disable_keybind so Ability 2 default Z does not fight us.
+        is_aimed_ability = false;
+        disable_keybind = true;
     }
 
     can_use :: method() -> bool {
-        return !player.is_dead;
+        if player.is_dead return false;
+        if current_cooldown > 0 return false;
+        if player.edge < ROLL_EDGE_COST return false;
+        return true;
     }
 
     on_update :: method(params: ref Ability_Update_Params) {
-        activation := Ability_Utilities.full_update_targeted_aimed_ability(player, this, ref params);
+        if Chat.is_open() return;
+        if player.is_chat_open() return;
 
-        if activation.activate {
-            current_cooldown = ROLL_COOLDOWN;
-            effect := new(Roll_Effect);
-            effect.direction = activation.direction;
-            player.entity.set_active_effect(effect);
+        // Button click OR raw Space this frame.
+        pressed := params.clicked || params.just_pressed || get_input_down(.SPACE, true);
+        if !pressed return;
+        dir := player.last_aim_direction;
+        mouse_dir := normalize(get_mouse_world_position() - player.entity.world_position);
+        if length(mouse_dir) > 0.01 {
+            dir = mouse_dir;
+        } else if length(player.agent.velocity) > 0.1 {
+            dir = normalize(player.agent.velocity);
+        } else if length(dir) < 0.01 {
+            dir = {1, 0};
         }
+
+        player.edge -= ROLL_EDGE_COST;
+        current_cooldown = ROLL_COOLDOWN;
+        player.last_aim_direction = dir;
+
+        effect := new(Roll_Effect);
+        effect.direction = dir;
+        player.entity.set_active_effect(effect);
     }
 }
 
