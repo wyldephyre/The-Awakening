@@ -10,7 +10,7 @@ g_spawner_rng: u64;
 g_spawner_initialized: bool;
 
 init_spawner :: proc() {
-    g_spawner_rng = rng_seed_time();
+    g_spawner_rng = rng_root_seed();
     g_spawner_initialized = true;
 }
 
